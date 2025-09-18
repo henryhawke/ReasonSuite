@@ -3,7 +3,7 @@
 **Version:** 0.1.0
 **Transport:** stdio (with optional Streamable HTTP)
 **SDK:** `@modelcontextprotocol/sdk` (TypeScript)
-**Node:** ≥ 18
+**Node:** ≥ 22
 
 ReasonSuite MCP exposes a **router** (plans which reasoning modes to use) plus **seven reasoning tool families** and matching **prompt templates**. It also ships with a small **constraint DSL** that compiles to **Z3** for exact constraint solving.
 
