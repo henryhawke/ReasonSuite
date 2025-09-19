@@ -10,6 +10,9 @@ import { registerSystems } from "./tools/systems.js";
 import { registerRedBlue } from "./tools/redblue.js";
 import { registerAnalogical } from "./tools/analogical.js";
 import { registerConstraint } from "./tools/constraint.js";
+import { registerScientific } from "./tools/scientific.js";
+import { registerSelfExplain } from "./tools/self_explain.js";
+import { registerDivergent } from "./tools/divergent.js";
 
 type ToolHandler = (args: any) => Promise<any>;
 
@@ -102,6 +105,9 @@ async function run() {
     registerRedBlue(server as any);
     registerAnalogical(server as any);
     registerConstraint(server as any);
+    registerScientific(server as any);
+    registerSelfExplain(server as any);
+    registerDivergent(server as any);
 
     async function call(name: string, args: any, validate: (obj: any) => void) {
         const h = server.tools.get(name);
@@ -122,6 +128,9 @@ async function run() {
     await call("redblue.challenge", { proposal: "P", rounds: 1, focus: ["safety"] }, (o) => { if (!Array.isArray(o.rounds)) throw new Error("redblue"); });
     await call("analogical.map", { source_domain: "S", target_problem: "T" }, (o) => { if (!Array.isArray(o.mapping)) throw new Error("analogical"); });
     await call("constraint.solve", { model_json: JSON.stringify({ variables: [{ name: "x", type: "Int" }], constraints: ["(>= x 0)"] }) }, (o) => { if (!o.status) throw new Error("constraint"); });
+    await call("reasoning.scientific", { goal: "Sort array", allow_tools: true }, (o) => { if (!Array.isArray(o.decomposition)) throw new Error("scientific"); });
+    await call("reasoning.self_explain", { query: "What is MDL?" }, (o) => { if (!Array.isArray(o.rationale)) throw new Error("self_explain"); });
+    await call("reasoning.divergent_convergent", { prompt: "App ideas", k: 3 }, (o) => { if (!Array.isArray(o.divergent)) throw new Error("divergent"); });
 
     console.log("All tools passed smoke test.");
 }

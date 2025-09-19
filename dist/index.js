@@ -21,6 +21,13 @@ import { registerSystemsPrompts } from "./prompts/systems.js";
 import { registerRedBluePrompts } from "./prompts/redblue.js";
 import { registerAnalogicalPrompts } from "./prompts/analogical.js";
 import { registerConstraintPrompts } from "./prompts/constraint.js";
+import { registerScientific } from "./tools/scientific.js";
+import { registerSelfExplain } from "./tools/self_explain.js";
+import { registerDivergent } from "./tools/divergent.js";
+import { registerScientificPrompts } from "./prompts/scientific.js";
+import { registerSelfExplainPrompts } from "./prompts/self_explain.js";
+import { registerDivergentPrompts } from "./prompts/divergent.js";
+import { registerExec } from "./tools/exec.js";
 const server = new McpServer({ name: "reason-suite-mcp", version: "0.1.0" });
 // Register tools
 registerRouter(server);
@@ -32,6 +39,10 @@ registerSystems(server);
 registerRedBlue(server);
 registerAnalogical(server);
 registerConstraint(server);
+registerScientific(server);
+registerSelfExplain(server);
+registerDivergent(server);
+registerExec(server);
 // Register prompts
 registerDialecticPrompts(server);
 registerSocraticPrompts(server);
@@ -40,6 +51,9 @@ registerSystemsPrompts(server);
 registerRedBluePrompts(server);
 registerAnalogicalPrompts(server);
 registerConstraintPrompts(server);
+registerScientificPrompts(server);
+registerSelfExplainPrompts(server);
+registerDivergentPrompts(server);
 async function addResource(file, title, description) {
     const p = path.resolve(process.cwd(), "src/resources", file);
     server.registerResource(file, `doc://${file}`, { title, description, mimeType: "text/markdown" }, async (uri) => ({ contents: [{ uri: uri.href, text: await fs.readFile(p, "utf-8") }] }));

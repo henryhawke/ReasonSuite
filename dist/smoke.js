@@ -9,6 +9,9 @@ import { registerSystems } from "./tools/systems.js";
 import { registerRedBlue } from "./tools/redblue.js";
 import { registerAnalogical } from "./tools/analogical.js";
 import { registerConstraint } from "./tools/constraint.js";
+import { registerScientific } from "./tools/scientific.js";
+import { registerSelfExplain } from "./tools/self_explain.js";
+import { registerDivergent } from "./tools/divergent.js";
 class FakeServer {
     tools = new Map();
     prompts = new Map();
@@ -103,6 +106,9 @@ async function run() {
     registerRedBlue(server);
     registerAnalogical(server);
     registerConstraint(server);
+    registerScientific(server);
+    registerSelfExplain(server);
+    registerDivergent(server);
     async function call(name, args, validate) {
         const h = server.tools.get(name);
         if (!h)
@@ -131,6 +137,12 @@ async function run() {
         throw new Error("analogical"); });
     await call("constraint.solve", { model_json: JSON.stringify({ variables: [{ name: "x", type: "Int" }], constraints: ["(>= x 0)"] }) }, (o) => { if (!o.status)
         throw new Error("constraint"); });
+    await call("reasoning.scientific", { goal: "Sort array", allow_tools: true }, (o) => { if (!Array.isArray(o.decomposition))
+        throw new Error("scientific"); });
+    await call("reasoning.self_explain", { query: "What is MDL?" }, (o) => { if (!Array.isArray(o.rationale))
+        throw new Error("self_explain"); });
+    await call("reasoning.divergent_convergent", { prompt: "App ideas", k: 3 }, (o) => { if (!Array.isArray(o.divergent))
+        throw new Error("divergent"); });
     console.log("All tools passed smoke test.");
 }
 run().catch((e) => { console.error(e); process.exit(1); });
