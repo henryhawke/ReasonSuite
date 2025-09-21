@@ -1,6 +1,6 @@
 import { z } from "zod";
 export function registerDialectic(server) {
-    server.registerTool("dialectic.tas", {
+    const config = {
         title: "Dialectic (Thesis–Antithesis–Synthesis)",
         description: "Given a claim, produce thesis, antithesis, and synthesis with evidence requests.",
         inputSchema: {
@@ -8,7 +8,8 @@ export function registerDialectic(server) {
             context: z.string().optional(),
             audience: z.string().default("general"),
         },
-    }, async ({ claim, context, audience }) => {
+    };
+    const handler = async ({ claim, context, audience }) => {
         const prompt = `Use a dialectical frame.
 Claim: ${claim}
 Context: ${context ?? ""}
@@ -27,5 +28,7 @@ Return strict JSON only:
         });
         const out = resp.content.type === "text" ? resp.content.text : "{}";
         return { content: [{ type: "text", text: out }] };
-    });
+    };
+    server.registerTool("dialectic.tas", config, handler);
+    server.registerTool("dialectic_tas", config, handler);
 }

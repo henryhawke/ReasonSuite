@@ -1,6 +1,6 @@
 import { z } from "zod";
 export function registerAnalogical(server) {
-    server.registerTool("analogical.map", {
+    const config = {
         title: "Analogical mapping",
         description: "Map structure from a source domain to a target problem; identify correspondences, constraints, and transfer risks.",
         inputSchema: {
@@ -8,7 +8,8 @@ export function registerAnalogical(server) {
             target_problem: z.string(),
             constraints: z.string().optional(),
         },
-    }, async ({ source_domain, target_problem, constraints }) => {
+    };
+    const handler = async ({ source_domain, target_problem, constraints }) => {
         const prompt = `Build a structural analogy from SOURCE to TARGET.
 
 SOURCE: ${source_domain}
@@ -28,5 +29,7 @@ JSON only:
             maxTokens: 900,
         });
         return { content: [{ type: "text", text: resp.content.type === "text" ? resp.content.text : "{}" }] };
-    });
+    };
+    server.registerTool("analogical.map", config, handler);
+    server.registerTool("analogical_map", config, handler);
 }

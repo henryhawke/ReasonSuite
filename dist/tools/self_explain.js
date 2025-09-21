@@ -1,13 +1,14 @@
 import { z } from "zod";
 export function registerSelfExplain(server) {
-    server.registerTool("reasoning.self_explain", {
+    const config = {
         title: "Transparent Self-Explanation",
         description: "Produce a rationale (chain-of-thought style summary), cite evidence, self-critique, and revise.",
         inputSchema: {
             query: z.string(),
             allow_citations: z.boolean().default(true),
         },
-    }, async ({ query, allow_citations }) => {
+    };
+    const handler = async ({ query, allow_citations }) => {
         const prompt = `Transparent Self-Explanation.
 Query: ${query}
 
@@ -36,5 +37,7 @@ If citations allowed, include sources; otherwise, note what would be retrieved.`
             };
             return { content: [{ type: "text", text: JSON.stringify(fallback, null, 2) }] };
         }
-    });
+    };
+    server.registerTool("reasoning.self_explain", config, handler);
+    server.registerTool("reasoning_self_explain", config, handler);
 }

@@ -21,7 +21,7 @@ function runInSandbox(code, timeoutMs) {
     let result;
     let timedOut = false;
     try {
-        const script = new Script(code, { filename: "exec.js", displayErrors: true });
+        const script = new Script(code, { filename: "exec.js" });
         result = script.runInContext(context, { timeout: timeoutMs });
     }
     catch (err) {
@@ -43,6 +43,11 @@ export function registerExec(server) {
                 .string()
                 .describe("JavaScript source to run. If the user provided fenced code, pass the content between the fences."),
             timeout_ms: z.number().int().min(10).max(10_000).default(1500),
+        },
+        annotations: {
+            readOnlyHint: true,
+            idempotentHint: true,
+            openWorldHint: false,
         },
     }, async ({ code, timeout_ms }) => {
         const result = runInSandbox(code, timeout_ms);

@@ -1,6 +1,6 @@
 import { z } from "zod";
 export function registerDivergent(server) {
-    server.registerTool("reasoning.divergent_convergent", {
+    const config = {
         title: "Divergent–Convergent Creative",
         description: "Generate multiple options (divergent), then evaluate and converge with criteria (convergent).",
         inputSchema: {
@@ -8,7 +8,8 @@ export function registerDivergent(server) {
             k: z.number().int().min(2).max(10).default(5),
             criteria: z.array(z.string()).default(["novelty", "consistency", "relevance"]),
         },
-    }, async ({ prompt, k, criteria }) => {
+    };
+    const handler = async ({ prompt, k, criteria }) => {
         const text = `Divergent then Convergent.
 Task: ${prompt}
 Candidates: ${k}
@@ -38,5 +39,7 @@ Return strict JSON only:
             };
             return { content: [{ type: "text", text: JSON.stringify(fallback, null, 2) }] };
         }
-    });
+    };
+    server.registerTool("reasoning.divergent_convergent", config, handler);
+    server.registerTool("reasoning_divergent_convergent", config, handler);
 }

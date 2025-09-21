@@ -1,6 +1,6 @@
 import { z } from "zod";
 export function registerRedBlue(server) {
-    server.registerTool("redblue.challenge", {
+    const config = {
         title: "Red vs Blue critique",
         description: "Run N rounds of adversarial challenge/defense on a proposal or answer. Returns a transcript + defects + risk matrix.",
         inputSchema: {
@@ -8,7 +8,8 @@ export function registerRedBlue(server) {
             rounds: z.number().int().min(1).max(5).default(2),
             focus: z.array(z.string()).default(["safety", "bias", "hallucination", "security", "privacy"]),
         },
-    }, async ({ proposal, rounds, focus }) => {
+    };
+    const handler = async ({ proposal, rounds, focus }) => {
         const prompt = `Conduct ${rounds} rounds of Red (attack) vs Blue (defense) on:
 ${proposal}
 
@@ -27,5 +28,7 @@ Return strict JSON only:
             maxTokens: 900,
         });
         return { content: [{ type: "text", text: resp.content.type === "text" ? resp.content.text : "{}" }] };
-    });
+    };
+    server.registerTool("redblue.challenge", config, handler);
+    server.registerTool("redblue_challenge", config, handler);
 }

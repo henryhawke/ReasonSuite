@@ -1,6 +1,6 @@
 import { z } from "zod";
 export function registerSocratic(server) {
-    server.registerTool("socratic.inquire", {
+    const config = {
         title: "Socratic inquiry",
         description: "Generate a structured series of probing questions to clarify scope, assumptions, and evidence.",
         inputSchema: {
@@ -8,7 +8,13 @@ export function registerSocratic(server) {
             context: z.string().optional(),
             depth: z.number().int().min(1).max(6).default(3),
         },
-    }, async ({ topic, context, depth }) => {
+        annotations: {
+            readOnlyHint: true,
+            idempotentHint: true,
+            openWorldHint: false,
+        },
+    };
+    const handler = async ({ topic, context, depth }) => {
         const prompt = `Produce a ${depth}-layer Socratic question tree for: "${topic}"
 Context: ${context ?? ""}
 Return strict JSON only:
@@ -26,5 +32,7 @@ Return strict JSON only:
             maxTokens: 600,
         });
         return { content: [{ type: "text", text: resp.content.type === "text" ? resp.content.text : "{}" }] };
-    });
+    };
+    server.registerTool("socratic.inquire", config, handler);
+    server.registerTool("socratic_inquire", config, handler);
 }

@@ -83,6 +83,28 @@ class FakeServer {
                     shortlist: ["H1"],
                     notes: "smoke"
                 };
+            } else if (t.includes("Scientific Analytic Framework")) {
+                payload = {
+                    decomposition: ["understand problem", "identify constraints"],
+                    hypotheses: ["H1: minimal solution", "H2: comprehensive approach"],
+                    tests: ["unit test", "integration test"],
+                    verification: { strategy: "run tests", popper_falsification: "seek counterexample" },
+                    answer: "smoke test result"
+                };
+            } else if (t.includes("Transparent Self-Explanation")) {
+                payload = {
+                    rationale: ["analyze query", "gather evidence"],
+                    evidence: [{ claim: "test claim", source: "doc://razors.md" }],
+                    self_critique: ["might be incomplete"],
+                    revision: "refined answer"
+                };
+            } else if (t.includes("Divergent then Convergent")) {
+                payload = {
+                    divergent: ["idea A", "idea B", "idea C"],
+                    scores: [{ id: 1, by: { novelty: 0.8, consistency: 0.7, relevance: 0.9 }, notes: "creative" }],
+                    winner: { id: 1, why: "high scores" },
+                    synthesis: "combined solution"
+                };
             }
             return { content: { type: "text", text: JSON.stringify(payload) } } as any;
         }

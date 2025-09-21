@@ -1,6 +1,6 @@
 import { z } from "zod";
 export function registerScientific(server) {
-    server.registerTool("reasoning.scientific", {
+    const config = {
         title: "Scientific Analytic Framework",
         description: "Decompose, hypothesize, test with tools, and verify (Popperian falsification).",
         inputSchema: {
@@ -8,7 +8,8 @@ export function registerScientific(server) {
             context: z.string().optional(),
             allow_tools: z.boolean().default(true),
         },
-    }, async ({ goal, context, allow_tools }) => {
+    };
+    const handler = async ({ goal, context, allow_tools }) => {
         const prompt = `You are an agent following a Scientific Analytic Framework.
 Goal: ${goal}
 Context: ${context ?? ""}
@@ -40,5 +41,7 @@ Prefer simpler explanations (Occam/MDL). If tools are allowed: propose concrete 
             };
             return { content: [{ type: "text", text: JSON.stringify(fallback, null, 2) }] };
         }
-    });
+    };
+    server.registerTool("reasoning.scientific", config, handler);
+    server.registerTool("reasoning_scientific", config, handler);
 }

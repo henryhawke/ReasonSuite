@@ -30,6 +30,27 @@ export function registerConstraint(server) {
                 ],
             };
         }
+        // Accept simple infix like "x > 5" by translating to SMT-LIB when possible
+        const translatedConstraints = req.constraints.map((c) => {
+            const m = c.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*(==|!=|>=|<=|>|<)\s*(-?\d+(?:\.\d+)?)\s*$/);
+            if (!m)
+                return c; // leave as-is
+            const [, left, op, right] = m;
+            const opMap = {
+                ">": ">",
+                "<": "<",
+                ">=": ">=",
+                "<=": "<=",
+                "==": "=",
+                "!=": "distinct",
+            };
+            const smt = opMap[op];
+            if (!smt)
+                return c;
+            if (smt === "distinct")
+                return `(distinct ${left} ${right})`;
+            return `(${smt} ${left} ${right})`;
+        });
         try {
             const { Context } = await init();
             const ctx = Context("reason-suite-constraint");
@@ -48,7 +69,7 @@ export function registerConstraint(server) {
                     variableSymbols[variable.name] = Bool.const(variable.name);
                 }
             }
-            const assertions = req.constraints.map((c) => `(assert ${c})`);
+            const assertions = translatedConstraints.map((c) => `(assert ${c})`);
             const baseScript = [...declarations, ...assertions].join("\n");
             if (req.optimize && req.optimize.objective) {
                 const opt = new Optimize();

@@ -2,19 +2,17 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
 export function registerSystems(server: McpServer): void {
-    server.registerTool(
-        "systems.map",
-        {
-            title: "Systems map (CLD)",
-            description:
-                "Create a causal loop diagram (Mermaid) with candidate reinforcing/balancing loops and leverage points.",
-            inputSchema: {
-                variables: z.array(z.string()).describe("Known variables").default([]),
-                context: z.string().optional(),
-            },
+    const config = {
+        title: "Systems map (CLD)",
+        description:
+            "Create a causal loop diagram (Mermaid) with candidate reinforcing/balancing loops and leverage points.",
+        inputSchema: {
+            variables: z.array(z.string()).describe("Known variables").default([]),
+            context: z.string().optional(),
         },
-        async ({ variables, context }) => {
-            const prompt = `Build a concise causal loop diagram (CLD) for the system below.
+    };
+    const handler = async ({ variables, context }: { variables: string[]; context?: string }) => {
+        const prompt = `Build a concise causal loop diagram (CLD) for the system below.
 Variables: ${variables.join(", ") || "(discover reasonable variables)"}
 Context: ${context ?? ""}
 
@@ -27,13 +25,14 @@ Return strict JSON only:
  "assumptions":["..."],
  "risks":["..."]
 }`;
-            const resp = await server.server.createMessage({
-                messages: [{ role: "user", content: { type: "text", text: prompt } }],
-                maxTokens: 1000,
-            });
-            return { content: [{ type: "text", text: resp.content.type === "text" ? resp.content.text : "{}" }] };
-        }
-    );
+        const resp = await server.server.createMessage({
+            messages: [{ role: "user", content: { type: "text", text: prompt } }],
+            maxTokens: 1000,
+        });
+        return { content: [{ type: "text", text: resp.content.type === "text" ? resp.content.text : "{}" }] };
+    };
+    server.registerTool("systems.map", config as any, handler as any);
+    server.registerTool("systems_map", config as any, handler as any);
 }
 
 

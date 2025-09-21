@@ -1,6 +1,6 @@
 import { z } from "zod";
 export function registerRazors(server) {
-    server.registerTool("razors.apply", {
+    const config = {
         title: "Apply reasoning razors",
         description: "Given candidate explanations, apply Occam/MDL, Bayesian Occam, Sagan, Hitchens, Hanlon, Popper falsifiability to produce keep/drop recommendations.",
         inputSchema: {
@@ -9,7 +9,13 @@ export function registerRazors(server) {
                 .array(z.string())
                 .default(["MDL", "BayesianOccam", "Sagan", "Hitchens", "Hanlon", "Popper"]),
         },
-    }, async ({ candidates_json, razors }) => {
+        annotations: {
+            readOnlyHint: true,
+            idempotentHint: true,
+            openWorldHint: false,
+        },
+    };
+    const handler = async ({ candidates_json, razors }) => {
         const prompt = `Candidates JSON:\n${candidates_json}
 Razors: ${razors.join(", ")}
 
@@ -23,5 +29,7 @@ Return strict JSON only:
             maxTokens: 700,
         });
         return { content: [{ type: "text", text: resp.content.type === "text" ? resp.content.text : "{}" }] };
-    });
+    };
+    server.registerTool("razors.apply", config, handler);
+    server.registerTool("razors_apply", config, handler);
 }

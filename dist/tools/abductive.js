@@ -1,6 +1,6 @@
 import { z } from "zod";
 export function registerAbductive(server) {
-    server.registerTool("abductive.hypothesize", {
+    const config = {
         title: "Abductive hypotheses",
         description: "Generate k candidate hypotheses and rank by plausibility, explanatory power, simplicity (MDL proxy), and testability.",
         inputSchema: {
@@ -8,7 +8,8 @@ export function registerAbductive(server) {
             k: z.number().int().min(2).max(10).default(4),
             apply_razors: z.array(z.string()).default(["MDL", "Hitchens", "Sagan", "Popper"]),
         },
-    }, async ({ observations, k, apply_razors }) => {
+    };
+    const handler = async ({ observations, k, apply_razors }) => {
         const prompt = `Observations:\n${observations}
 
 Generate ${k} abductive hypotheses. Score each on:
@@ -32,5 +33,7 @@ Return strict JSON only:
             maxTokens: 900,
         });
         return { content: [{ type: "text", text: resp.content.type === "text" ? resp.content.text : "{}" }] };
-    });
+    };
+    server.registerTool("abductive.hypothesize", config, handler);
+    server.registerTool("abductive_hypothesize", config, handler);
 }

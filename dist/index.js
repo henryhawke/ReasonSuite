@@ -28,21 +28,27 @@ import { registerScientificPrompts } from "./prompts/scientific.js";
 import { registerSelfExplainPrompts } from "./prompts/self_explain.js";
 import { registerDivergentPrompts } from "./prompts/divergent.js";
 import { registerExec } from "./tools/exec.js";
-const server = new McpServer({ name: "reason-suite-mcp", version: "0.1.0" });
+import { registerReasoning } from "./tools/reasoning.js";
+const server = new McpServer({ name: "reason-suite-mcp", version: "0.1.0" }, {
+    instructions: "Use reasoning tools proactively. If the user goal is unclear or multi-step, first call 'reasoning.router.plan'. Then: use 'socratic.inquire' for scoping questions; 'abductive.hypothesize' to generate hypotheses; 'razors.apply' to prune options; 'analogical.map' for cross-domain transfer; 'systems.map' for many interacting variables; 'constraint.solve' for numeric/logical constraints; 'redblue.challenge' for adversarial evaluation; 'reasoning.scientific' for structured decomposition/testing; 'reasoning.self_explain' for rationale and critique. Prefer read-only, idempotent tools by default. Use 'exec.run' only for small, safe calculations in a sandbox.",
+});
 // Register tools
 registerRouter(server);
-registerRazors(server);
-registerDialectic(server);
-registerSocratic(server);
-registerAbductive(server);
-registerSystems(server);
-registerRedBlue(server);
-registerAnalogical(server);
+registerReasoning(server);
 registerConstraint(server);
-registerScientific(server);
-registerSelfExplain(server);
-registerDivergent(server);
 registerExec(server);
+if (process.env.REASONSUITE_ENABLE_LEGACY === "1") {
+    registerRazors(server);
+    registerDialectic(server);
+    registerSocratic(server);
+    registerAbductive(server);
+    registerSystems(server);
+    registerRedBlue(server);
+    registerAnalogical(server);
+    registerScientific(server);
+    registerSelfExplain(server);
+    registerDivergent(server);
+}
 // Register prompts
 registerDialecticPrompts(server);
 registerSocraticPrompts(server);

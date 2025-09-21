@@ -33,7 +33,7 @@ function runInSandbox(code: string, timeoutMs: number): ExecResult {
     let result: unknown;
     let timedOut = false;
     try {
-        const script = new Script(code, { filename: "exec.js", displayErrors: true });
+        const script = new Script(code, { filename: "exec.js" });
         result = script.runInContext(context, { timeout: timeoutMs });
     } catch (err: any) {
         if (String(err?.message ?? err).includes("Script execution timed out")) {

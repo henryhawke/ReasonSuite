@@ -1,13 +1,14 @@
 import { z } from "zod";
 export function registerSystems(server) {
-    server.registerTool("systems.map", {
+    const config = {
         title: "Systems map (CLD)",
         description: "Create a causal loop diagram (Mermaid) with candidate reinforcing/balancing loops and leverage points.",
         inputSchema: {
             variables: z.array(z.string()).describe("Known variables").default([]),
             context: z.string().optional(),
         },
-    }, async ({ variables, context }) => {
+    };
+    const handler = async ({ variables, context }) => {
         const prompt = `Build a concise causal loop diagram (CLD) for the system below.
 Variables: ${variables.join(", ") || "(discover reasonable variables)"}
 Context: ${context ?? ""}
@@ -26,5 +27,7 @@ Return strict JSON only:
             maxTokens: 1000,
         });
         return { content: [{ type: "text", text: resp.content.type === "text" ? resp.content.text : "{}" }] };
-    });
+    };
+    server.registerTool("systems.map", config, handler);
+    server.registerTool("systems_map", config, handler);
 }
