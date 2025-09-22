@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import fs from "node:fs/promises";
+import { createServer } from "node:http";
 import path from "node:path";
 
 // Tools
@@ -14,6 +15,11 @@ import { registerAnalogical } from "./tools/analogical.js";
 import { registerConstraint } from "./tools/constraint.js";
 import { registerRazors } from "./tools/razors.js";
 import { registerRouter } from "./router/router.js";
+import { registerScientific } from "./tools/scientific.js";
+import { registerSelfExplain } from "./tools/self_explain.js";
+import { registerDivergent } from "./tools/divergent.js";
+import { registerExec } from "./tools/exec.js";
+import { registerSelector } from "./tools/selector.js";
 
 // Prompts
 import { registerDialecticPrompts } from "./prompts/dialectic.js";
@@ -23,13 +29,9 @@ import { registerSystemsPrompts } from "./prompts/systems.js";
 import { registerRedBluePrompts } from "./prompts/redblue.js";
 import { registerAnalogicalPrompts } from "./prompts/analogical.js";
 import { registerConstraintPrompts } from "./prompts/constraint.js";
-import { registerScientific } from "./tools/scientific.js";
-import { registerSelfExplain } from "./tools/self_explain.js";
-import { registerDivergent } from "./tools/divergent.js";
 import { registerScientificPrompts } from "./prompts/scientific.js";
 import { registerSelfExplainPrompts } from "./prompts/self_explain.js";
 import { registerDivergentPrompts } from "./prompts/divergent.js";
-import { registerExec } from "./tools/exec.js";
 
 const server = new McpServer({ name: "reason-suite-mcp", version: "0.1.0" });
 
@@ -47,6 +49,7 @@ registerScientific(server);
 registerSelfExplain(server);
 registerDivergent(server);
 registerExec(server);
+registerSelector(server);
 
 // Register prompts
 registerDialecticPrompts(server);
@@ -75,15 +78,36 @@ await addResource("systems-cheatsheet.md", "Systems Thinking Cheatsheet", "Causa
 await addResource("constraint-dsl.md", "Constraint DSL", "Mini-DSL compiled to Z3");
 
 const mode = process.env.MCP_TRANSPORT ?? "stdio";
+
 if (mode === "http") {
     const port = Number(process.env.PORT ?? 3333);
-    const transport: any = new StreamableHTTPServerTransport({ port } as any);
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+
+    const httpServer = createServer(async (req: any, res: any) => {
+        try {
+            await transport.handleRequest(req, res);
+        } catch (err) {
+            const message = (err as Error)?.message ?? "Internal server error";
+            res.writeHead(500, { "content-type": "application/json" }).end(
+                JSON.stringify({ jsonrpc: "2.0", error: { code: -32000, message }, id: null })
+            );
+            console.error("Transport error", err);
+        }
+    });
+
+    transport.onclose = () => {
+        httpServer.close((err?: any) => {
+            if (err) {
+                console.error("Failed to close HTTP server", err);
+            }
+        });
+    };
+
     await server.connect(transport);
-    console.log("ReasonSuite MCP server listening on HTTP " + port);
+    await new Promise<void>((resolve) => httpServer.listen(port, resolve));
+    console.log(`ReasonSuite MCP server listening on HTTP ${port}`);
 } else {
     const transport = new StdioServerTransport();
     await server.connect(transport);
     console.log("ReasonSuite MCP server on stdio");
 }
-
-

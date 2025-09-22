@@ -1,18 +1,39 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import type { ZodRawShape } from "zod";
+import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
+
+const InputSchema = z.object({
+    source_domain: z.string(),
+    target_problem: z.string(),
+    constraints: z.string().optional(),
+});
+
+const inputShape = InputSchema.shape as ZodRawShape;
+
+type InputArgs = z.output<typeof InputSchema>;
+type InputShape = typeof inputShape;
+
+const OutputSchema = z
+    .object({
+        mapping: z
+            .array(
+                z.object({
+                    source: z.string(),
+                    target: z.string(),
+                    justification: z.string(),
+                })
+            )
+            .default([]),
+        shared_relations: z.array(z.string()).default([]),
+        mismatches: z.array(z.string()).default([]),
+        transferable_insights: z.array(z.string()).default([]),
+        failure_modes: z.array(z.string()).default([]),
+    })
+    .extend({ meta: ReasoningMetadataSchema.optional() });
 
 export function registerAnalogical(server: McpServer): void {
-    const config = {
-        title: "Analogical mapping",
-        description:
-            "Map structure from a source domain to a target problem; identify correspondences, constraints, and transfer risks.",
-        inputSchema: {
-            source_domain: z.string(),
-            target_problem: z.string(),
-            constraints: z.string().optional(),
-        },
-    };
-    const handler = async ({ source_domain, target_problem, constraints }: { source_domain: string; target_problem: string; constraints?: string }) => {
+    const handler: ToolCallback<InputShape> = async ({ source_domain, target_problem, constraints }) => {
         const prompt = `Build a structural analogy from SOURCE to TARGET.
 
 SOURCE: ${source_domain}
@@ -27,14 +48,35 @@ JSON only:
  "transferable_insights":["..."],
  "failure_modes":["..."]
 }`;
-        const resp = await server.server.createMessage({
-            messages: [{ role: "user", content: { type: "text", text: prompt } }],
+        const { text } = await sampleStructuredJson({
+            server,
+            prompt,
             maxTokens: 900,
+            schema: OutputSchema,
+            fallback: () => ({
+                mapping: [
+                    {
+                        source: source_domain,
+                        target: target_problem,
+                        justification: "Match core structure (actors, resources, feedback).",
+                    },
+                ],
+                shared_relations: ["Identify analogous causal chain", "Compare resource constraints"],
+                mismatches: ["Context-specific regulations", "Scale differences"],
+                transferable_insights: ["Borrow proven intervention pattern", "Adopt metric from source domain"],
+                failure_modes: ["Surface-level analogy misses hidden variable", "Target lacks enabling infrastructure"],
+            }),
         });
-        return { content: [{ type: "text", text: resp.content.type === "text" ? resp.content.text : "{}" }] };
+        return { content: [{ type: "text", text }] };
     };
-    server.registerTool("analogical.map", config as any, handler as any);
-    server.registerTool("analogical_map", config as any, handler as any);
+
+    const config = {
+        title: "Analogical mapping",
+        description:
+            "Map structure from a source domain to a target problem; identify correspondences, constraints, and transfer risks.",
+        inputSchema: inputShape,
+    };
+
+    server.registerTool("analogical.map", config, handler);
+    server.registerTool("analogical_map", config, handler);
 }
-
-

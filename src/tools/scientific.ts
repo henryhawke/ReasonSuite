@@ -1,17 +1,34 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import type { ZodRawShape } from "zod";
+import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
+
+const InputSchema = z.object({
+    goal: z.string().describe("Problem to solve"),
+    context: z.string().optional(),
+    allow_tools: z.boolean().default(true),
+});
+
+const inputShape = InputSchema.shape as ZodRawShape;
+
+type InputArgs = z.output<typeof InputSchema>;
+type InputShape = typeof inputShape;
+
+const OutputSchema = z
+    .object({
+        decomposition: z.array(z.string()).default([]),
+        hypotheses: z.array(z.string()).default([]),
+        tests: z.array(z.string()).default([]),
+        verification: z.object({
+            strategy: z.string(),
+            popper_falsification: z.string(),
+        }),
+        answer: z.string(),
+    })
+    .extend({ meta: ReasoningMetadataSchema.optional() });
 
 export function registerScientific(server: McpServer): void {
-    const config = {
-        title: "Scientific Analytic Framework",
-        description: "Decompose, hypothesize, test with tools, and verify (Popperian falsification).",
-        inputSchema: {
-            goal: z.string().describe("Problem to solve"),
-            context: z.string().optional(),
-            allow_tools: z.boolean().default(true),
-        },
-    };
-    const handler = async ({ goal, context, allow_tools }: { goal: string; context?: string; allow_tools: boolean }) => {
+    const handler: ToolCallback<InputShape> = async ({ goal, context, allow_tools }) => {
         const prompt = `You are an agent following a Scientific Analytic Framework.
 Goal: ${goal}
 Context: ${context ?? ""}
@@ -21,31 +38,37 @@ Produce strict JSON only:
   "decomposition": ["..."],
   "hypotheses": ["..."],
   "tests": ["tool/check to run"],
-  "verification": {"strategy":"...","popper_falsification":"..."},
-  "answer": "final" 
+ "verification": {"strategy":"...","popper_falsification":"..."},
+ "answer": "final"
 }
 Prefer simpler explanations (Occam/MDL). If tools are allowed: propose concrete checks (unit tests, Z3 constraints, code run).`;
-        try {
-            const resp = await server.server.createMessage({
-                messages: [{ role: "user", content: { type: "text", text: prompt } }],
-                maxTokens: 900,
-            });
-            const out = resp.content.type === "text" ? resp.content.text : "{}";
-            return { content: [{ type: "text", text: out }] };
-        } catch {
-            const fallback = {
-                decomposition: ["understand requirements", "identify invariants"],
-                hypotheses: ["H1 minimal", "H2 alternative"],
-                tests: ["unit:test", "z3:constraint"],
-                verification: { strategy: "run tests", popper_falsification: "seek counterexample" },
-                answer: "draft",
-            };
-            return { content: [{ type: "text", text: JSON.stringify(fallback, null, 2) }] };
-        }
+        const { text } = await sampleStructuredJson({
+            server,
+            prompt,
+            maxTokens: 900,
+            schema: OutputSchema,
+            fallback: () => ({
+                decomposition: ["Understand requirements", "List governing constraints"],
+                hypotheses: ["H1: Minimal viable approach", "H2: Alternative for edge cases"],
+                tests: allow_tools
+                    ? ["unit:cover critical functions", "z3:model invariants", "exec:quick simulation"]
+                    : ["thought experiment", "manual consistency check"],
+                verification: {
+                    strategy: allow_tools ? "Execute proposed tests" : "Seek peer/expert review",
+                    popper_falsification: "Identify counterexample that would invalidate the answer",
+                },
+                answer: "Deterministic scaffold—rerun with sampling for richer details.",
+            }),
+        });
+        return { content: [{ type: "text", text }] };
     };
-    server.registerTool("reasoning.scientific", config as any, handler as any);
-    server.registerTool("reasoning_scientific", config as any, handler as any);
+
+    const config = {
+        title: "Scientific Analytic Framework",
+        description: "Decompose, hypothesize, test with tools, and verify (Popperian falsification).",
+        inputSchema: inputShape,
+    };
+
+    server.registerTool("reasoning.scientific", config, handler);
+    server.registerTool("reasoning_scientific", config, handler);
 }
-
-
-

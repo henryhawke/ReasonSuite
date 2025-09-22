@@ -1,21 +1,44 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
+import type { ZodRawShape } from "zod";
+
+const InputSchema = z.object({
+    prompt: z.string(),
+    k: z.number().int().min(2).max(10).default(5),
+    criteria: z.array(z.string()).default(["novelty", "consistency", "relevance"]),
+});
+
+const inputShape = InputSchema.shape as ZodRawShape;
+
+type InputArgs = z.output<typeof InputSchema>;
+type InputShape = typeof inputShape;
+
+const OutputSchema = z
+    .object({
+        divergent: z.array(z.string()).default([]),
+        scores: z
+            .array(
+                z.object({
+                    id: z.number().int(),
+                    by: z.record(z.string(), z.number()),
+                    notes: z.string().optional(),
+                })
+            )
+            .default([]),
+        winner: z.object({ id: z.number().int(), why: z.string() }),
+        synthesis: z.string(),
+    })
+    .extend({ meta: ReasoningMetadataSchema.optional() });
 
 export function registerDivergent(server: McpServer): void {
-    const config = {
-        title: "Divergent–Convergent Creative",
-        description: "Generate multiple options (divergent), then evaluate and converge with criteria (convergent).",
-        inputSchema: {
-            prompt: z.string(),
-            k: z.number().int().min(2).max(10).default(5),
-            criteria: z.array(z.string()).default(["novelty", "consistency", "relevance"]),
-        },
-    };
-    const handler = async ({ prompt, k, criteria }: { prompt: string; k: number; criteria: string[] }) => {
+    const handler: ToolCallback<InputShape> = async ({ prompt, k, criteria }) => {
+        const activeCriteria = criteria?.length ? criteria : ["novelty", "consistency", "relevance"];
+
         const text = `Divergent then Convergent.
 Task: ${prompt}
 Candidates: ${k}
-Criteria: ${criteria.join(", ")}
+Criteria: ${activeCriteria.join(", ")}
 
 Return strict JSON only:
 {
@@ -24,26 +47,35 @@ Return strict JSON only:
   "winner": {"id": 1, "why": "..."},
   "synthesis": "refined solution"
 }`;
-        try {
-            const resp = await server.server.createMessage({
-                messages: [{ role: "user", content: { type: "text", text } }],
-                maxTokens: 900,
-            });
-            const out = resp.content.type === "text" ? resp.content.text : "{}";
-            return { content: [{ type: "text", text: out }] };
-        } catch {
-            const fallback = {
-                divergent: ["A", "B", "C"],
-                scores: [{ id: 1, by: { novelty: 0.6, consistency: 0.7, relevance: 0.8 }, notes: "ok" }],
-                winner: { id: 1, why: "balanced" },
-                synthesis: "C'",
-            };
-            return { content: [{ type: "text", text: JSON.stringify(fallback, null, 2) }] };
-        }
+        const { text: resultText } = await sampleStructuredJson({
+            server,
+            prompt: text,
+            maxTokens: 900,
+            schema: OutputSchema,
+            fallback: () => ({
+                divergent: Array.from({ length: Math.min(k, 5) }, (_, idx) => `Idea ${idx + 1} for ${prompt}`),
+                scores: [
+                    {
+                        id: 1,
+                        by: Object.fromEntries(
+                            activeCriteria.map((criterion: string) => [criterion, 0.7] as const)
+                        ),
+                        notes: "Deterministic fallback scoring.",
+                    },
+                ],
+                winner: { id: 1, why: "Best balance across criteria" },
+                synthesis: "Combine leading idea with mitigations.",
+            }),
+        });
+        return { content: [{ type: "text", text: resultText }] };
     };
-    server.registerTool("reasoning.divergent_convergent", config as any, handler as any);
-    server.registerTool("reasoning_divergent_convergent", config as any, handler as any);
+
+    const config = {
+        title: "Divergent–Convergent Creative",
+        description: "Generate multiple options (divergent), then evaluate and converge with criteria (convergent).",
+        inputSchema: inputShape,
+    };
+
+    server.registerTool("reasoning.divergent_convergent", config, handler);
+    server.registerTool("reasoning_divergent_convergent", config, handler);
 }
-
-
-
