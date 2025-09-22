@@ -6,10 +6,21 @@ export type ReasoningMode =
     | "redblue"
     | "analogical"
     | "constraint"
-    | "razors.apply";
+    | "razors.apply"
+    | "scientific"
+    | "self_explain"
+    | "divergent"
+    | "exec";
+
+export type ReasoningMetadata = {
+    source: "model" | "fallback";
+    warnings?: string[];
+    raw?: string;
+};
 
 export type RouterStep = {
     mode: ReasoningMode;
+    tool?: string;
     why: string;
     args?: Record<string, unknown>;
 };
@@ -17,6 +28,7 @@ export type RouterStep = {
 export type RouterPlan = {
     steps: RouterStep[];
     notes?: string;
+    meta?: ReasoningMetadata;
 };
 
 export type DialecticResult = {
@@ -29,6 +41,7 @@ export type DialecticResult = {
         evidence_needed: string[];
     };
     open_questions: string[];
+    meta?: ReasoningMetadata;
 };
 
 export type SocraticTree = {
@@ -36,6 +49,7 @@ export type SocraticTree = {
     assumptions_to_test: string[];
     evidence_to_collect: string[];
     next_actions: string[];
+    meta?: ReasoningMetadata;
 };
 
 export type AbductiveHypothesis = {
@@ -55,6 +69,7 @@ export type AbductiveResult = {
     hypotheses: AbductiveHypothesis[];
     experiments_or_evidence: string[];
     notes?: string;
+    meta?: ReasoningMetadata;
 };
 
 export type RazorsDecision = {
@@ -68,6 +83,7 @@ export type RazorsResult = {
     results: RazorsDecision[];
     shortlist: string[];
     notes?: string;
+    meta?: ReasoningMetadata;
 };
 
 export type SystemsMap = {
@@ -77,6 +93,7 @@ export type SystemsMap = {
     stock_flow_hints: { stock: string; inflows: string[]; outflows: string[] }[];
     assumptions: string[];
     risks: string[];
+    meta?: ReasoningMetadata;
 };
 
 export type RedBlueRound = {
@@ -90,6 +107,7 @@ export type RedBlueResult = {
     defects: { type: string; severity: "low" | "med" | "high"; evidence: string }[];
     risk_matrix: { low: string[]; medium: string[]; high: string[] };
     final_guidance: string[];
+    meta?: ReasoningMetadata;
 };
 
 export type AnalogicalResult = {
@@ -98,6 +116,15 @@ export type AnalogicalResult = {
     mismatches: string[];
     transferable_insights: string[];
     failure_modes: string[];
+    meta?: ReasoningMetadata;
 };
 
-
+export type ReasoningSelectorResult = {
+    primary_mode: { id: string; label: string; confidence: number; reason: string };
+    supporting_modes: { id: string; label: string; score: number; reason: string }[];
+    razor_stack: { id: string; label: string; score: number; reason: string }[];
+    decision_path: { observation: string; implication: string }[];
+    next_action?: string;
+    notes?: string;
+    meta?: ReasoningMetadata;
+};

@@ -1,18 +1,35 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import type { ZodRawShape } from "zod";
+import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
+
+const InputSchema = z.object({
+    claim: z.string(),
+    context: z.string().optional(),
+    audience: z.string().default("general"),
+});
+
+const inputShape = InputSchema.shape as ZodRawShape;
+
+type InputArgs = z.output<typeof InputSchema>;
+type InputShape = typeof inputShape;
+
+const OutputSchema = z
+    .object({
+        thesis: z.object({ position: z.string(), key_points: z.array(z.string()).default([]) }),
+        antithesis: z.object({ position: z.string(), key_points: z.array(z.string()).default([]) }),
+        synthesis: z.object({
+            proposal: z.string(),
+            assumptions: z.array(z.string()).default([]),
+            tradeoffs: z.array(z.string()).default([]),
+            evidence_needed: z.array(z.string()).default([]),
+        }),
+        open_questions: z.array(z.string()).default([]),
+    })
+    .extend({ meta: ReasoningMetadataSchema.optional() });
 
 export function registerDialectic(server: McpServer): void {
-    const config = {
-        title: "Dialectic (Thesis–Antithesis–Synthesis)",
-        description:
-            "Given a claim, produce thesis, antithesis, and synthesis with evidence requests.",
-        inputSchema: {
-            claim: z.string(),
-            context: z.string().optional(),
-            audience: z.string().default("general"),
-        },
-    };
-    const handler = async ({ claim, context, audience }: { claim: string; context?: string; audience: string }) => {
+    const handler: ToolCallback<InputShape> = async ({ claim, context, audience }) => {
         const prompt = `Use a dialectical frame.
 Claim: ${claim}
 Context: ${context ?? ""}
@@ -22,18 +39,41 @@ Return strict JSON only:
 {
  "thesis": {"position": "...", "key_points": ["..."]},
  "antithesis": {"position": "...", "key_points": ["..."]},
- "synthesis": {"proposal": "...", "assumptions": ["..."], "tradeoffs": ["..."], "evidence_needed": ["..."]},
- "open_questions": ["..."]
+"synthesis": {"proposal": "...", "assumptions": ["..."], "tradeoffs": ["..."], "evidence_needed": ["..."]},
+"open_questions": ["..."]
 }`;
-        const resp = await server.server.createMessage({
-            messages: [{ role: "user", content: { type: "text", text: prompt } }],
+        const { text } = await sampleStructuredJson({
+            server,
+            prompt,
             maxTokens: 700,
+            schema: OutputSchema,
+            fallback: () => ({
+                thesis: {
+                    position: `Clarify and defend the core of "${claim}"`,
+                    key_points: ["state assumptions", "highlight supporting evidence"],
+                },
+                antithesis: {
+                    position: "Interrogate weaknesses or counter-cases",
+                    key_points: ["surface missing evidence", "describe risks to the audience"],
+                },
+                synthesis: {
+                    proposal: "Blend validated parts of claim with mitigations",
+                    assumptions: [context ? "context details hold" : "background facts verified"],
+                    tradeoffs: ["balance confidence vs. uncertainty"],
+                    evidence_needed: ["collect targeted data or expert review"],
+                },
+                open_questions: ["Which stakeholder perspectives are under-represented?"],
+            }),
         });
-        const out = resp.content.type === "text" ? resp.content.text : "{}";
-        return { content: [{ type: "text", text: out }] };
+        return { content: [{ type: "text", text }] };
     };
-    server.registerTool("dialectic.tas", config as any, handler as any);
-    server.registerTool("dialectic_tas", config as any, handler as any);
+
+    const config = {
+        title: "Dialectic (Thesis–Antithesis–Synthesis)",
+        description: "Given a claim, produce thesis, antithesis, and synthesis with evidence requests.",
+        inputSchema: inputShape,
+    };
+
+    server.registerTool("dialectic.tas", config, handler);
+    server.registerTool("dialectic_tas", config, handler);
 }
-
-

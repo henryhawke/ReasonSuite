@@ -5,7 +5,8 @@ ReasonSuite MCP is a Model Context Protocol (MCP) server that bundles a planning
 ## Highlights
 
 - **Router-led planning.** The `reasoning.router.plan` tool picks a sequence of reasoning modes (dialectic, Socratic, abductive, systems, red/blue, analogical, constraint, razors) with arguments and rationale, falling back to a deterministic plan if sampling is unavailable.
-- **Seven reasoning tools.** Dialectic, Socratic, abductive, systems thinking, red/blue challenge, analogical mapping, and constraint solving are all exposed as MCP tools and return strict JSON payloads suitable for downstream automation.
+- **Comprehensive reasoning tools.** Dialectic, Socratic, abductive, systems thinking, red/blue challenge, analogical mapping, constraint solving, divergent/convergent synthesis, self-explanation, and the exec sandbox are all exposed as MCP tools that return strict JSON payloads.
+- **Meta selection helper.** A prompt-agnostic `reasoning.selector` tool inspects any request and recommends the next reasoning mode plus the most relevant Occam/Popper-style razors.
 - **Occam & falsifiability razors.** A dedicated `razors.apply` tool scores candidate explanations using MDL/Occam, Bayesian Occam, Sagan, Hitchens, Hanlon, and Popper heuristics.
 - **Prompt templates.** Matching MCP prompts are registered for each tool family so clients can opt into template-driven prompting instead of direct tool calls.
 - **Embedded resources.** Quick references (razors, systems thinking cheatsheet, constraint DSL) are published via MCP resources for in-client lookup.
@@ -63,6 +64,7 @@ After the server starts, connect with your MCP client, list the available tools/
 | Tool ID | Description |
 | --- | --- |
 | `reasoning.router.plan` | Plan a sequence of reasoning modes with arguments and rationale, with a safe fallback when sampling is unavailable. |
+| `reasoning.selector` | Recommend the most suitable reasoning mode plus supporting razors for a given request. |
 | `dialectic.tas` | Produce thesis, antithesis, synthesis, and open questions for a claim. |
 | `socratic.inquire` | Generate multi-layer Socratic question trees plus assumptions, evidence, and next actions. |
 | `abductive.hypothesize` | Generate and score candidate hypotheses, optionally applying razors. |

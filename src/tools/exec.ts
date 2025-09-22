@@ -1,5 +1,6 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import type { ZodRawShape } from "zod";
 import { Script, createContext } from "node:vm";
 
 type ExecResult = {
@@ -8,6 +9,18 @@ type ExecResult = {
     result?: unknown;
     timedOut: boolean;
 };
+
+const InputSchema = z.object({
+    code: z
+        .string()
+        .describe("JavaScript source to run. If the user provided fenced code, pass the content between the fences."),
+    timeout_ms: z.number().int().min(10).max(10_000).default(1500),
+});
+
+const inputShape = InputSchema.shape as ZodRawShape;
+
+type InputArgs = z.output<typeof InputSchema>;
+type InputShape = typeof inputShape;
 
 function runInSandbox(code: string, timeoutMs: number): ExecResult {
     const stdout: string[] = [];
@@ -22,7 +35,6 @@ function runInSandbox(code: string, timeoutMs: number): ExecResult {
     const sandbox: Record<string, unknown> = {
         console: sandboxConsole,
         print: (v: unknown) => stdout.push(String(v)),
-        // Provide a minimal set of globals; no access to require or process
         setTimeout,
         setInterval,
         clearTimeout,
@@ -35,11 +47,11 @@ function runInSandbox(code: string, timeoutMs: number): ExecResult {
     try {
         const script = new Script(code, { filename: "exec.js" });
         result = script.runInContext(context, { timeout: timeoutMs });
-    } catch (err: any) {
-        if (String(err?.message ?? err).includes("Script execution timed out")) {
+    } catch (err: unknown) {
+        if (String((err as Error)?.message ?? err).includes("Script execution timed out")) {
             timedOut = true;
         } else {
-            stderr.push(err?.stack ?? String(err));
+            stderr.push((err as Error)?.stack ?? String(err));
         }
     }
 
@@ -47,32 +59,25 @@ function runInSandbox(code: string, timeoutMs: number): ExecResult {
 }
 
 export function registerExec(server: McpServer): void {
+    const handler: ToolCallback<InputShape> = async ({ code, timeout_ms }) => {
+        const result = runInSandbox(code, timeout_ms);
+        const payload: ExecResult = {
+            stdout: result.stdout,
+            stderr: result.stderr,
+            result: result.result,
+            timedOut: result.timedOut,
+        };
+        return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }] };
+    };
+
     server.registerTool(
         "exec.run",
         {
             title: "Run sandboxed JavaScript code",
             description:
                 "Execute JavaScript code in a secure VM sandbox with a time limit. Captures print()/console.log output.",
-            inputSchema: {
-                code: z
-                    .string()
-                    .describe(
-                        "JavaScript source to run. If the user provided fenced code, pass the content between the fences."
-                    ),
-                timeout_ms: z.number().int().min(10).max(10_000).default(1500),
-            },
+            inputSchema: inputShape,
         },
-        async ({ code, timeout_ms }) => {
-            const result = runInSandbox(code, timeout_ms);
-            const payload = {
-                stdout: result.stdout,
-                stderr: result.stderr,
-                result: result.result,
-                timedOut: result.timedOut,
-            } satisfies ExecResult;
-            return { content: [{ type: "text", text: JSON.stringify(payload) }] };
-        }
+        handler
     );
 }
-
-
