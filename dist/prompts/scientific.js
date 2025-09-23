@@ -1,10 +1,13 @@
 import { z } from "zod";
+import { definePromptArgsShape } from "../lib/prompt.js";
+const ArgsSchema = z.object({
+    goal: z.string(),
+    context: z.string().optional(),
+    allow_tools: z.string().optional(),
+});
+const argsShape = definePromptArgsShape(ArgsSchema.shape);
 export function registerScientificPrompts(server) {
-    server.registerPrompt("reasoning.scientific", {
-        title: "Scientific Analytic",
-        description: "Decompose → hypothesize → test → verify",
-        argsSchema: { goal: z.string(), context: z.string().optional(), allow_tools: z.string().optional() },
-    }, ({ goal, context, allow_tools }) => ({
+    const callback = ({ goal, context, allow_tools }, _extra) => ({
         messages: [
             {
                 role: "user",
@@ -14,5 +17,10 @@ export function registerScientificPrompts(server) {
                 },
             },
         ],
-    }));
+    });
+    server.registerPrompt("reasoning.scientific", {
+        title: "Scientific Analytic",
+        description: "Decompose → hypothesize → test → verify",
+        argsSchema: argsShape,
+    }, callback);
 }

@@ -13,9 +13,9 @@ export function registerAbductivePrompts(server: McpServer): void {
     const callback: PromptCallback<typeof argsShape> = ({ observations, k }, _extra) => ({
         messages: [
             {
-                role: "user",
+                role: "user" as const,
                 content: {
-                    type: "text",
+                    type: "text" as const,
                     text: `Observations:\n${observations}\nGenerate ${k ?? "4"} abductive hypotheses with scores (prior, power, simplicity_penalty (MDL proxy), testability) and overall. Output JSON.`,
                 },
             },

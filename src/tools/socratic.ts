@@ -50,9 +50,9 @@ Return strict JSON only:
                         questions:
                             idx === 0
                                 ? [
-                                      `What exactly counts as success for "${topic}"?`,
-                                      "Which stakeholders or constraints might we be missing?",
-                                  ]
+                                    `What exactly counts as success for "${topic}"?`,
+                                    "Which stakeholders or constraints might we be missing?",
+                                ]
                                 : ["What evidence would confirm or refute prior answers?"],
                     })),
                     assumptions_to_test: ["Clarify hidden premises", "Check context-specific caveats"],

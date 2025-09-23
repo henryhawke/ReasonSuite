@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { ZodRawShape } from "zod";
 import { DEFAULT_RAZORS } from "../lib/razors.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
+import { buildFallback as selectorFallback } from "../tools/selector.js";
 import type { RouterPlan, RouterStep } from "../lib/types.js";
 
 const ModeSchema = z.enum([
@@ -235,12 +236,52 @@ function buildHeuristicPlan(task: string, context: string | undefined, maxSteps:
     }
 
     if (steps.length === 1 && steps[0].mode === "socratic") {
-        push({
-            mode: "scientific",
-            tool: "reasoning.scientific",
-            why: "Structure the next investigative steps when no other heuristic fired",
-            args: { allow_tools: true },
-        });
+        const selector = selectorFallback(task, context, [
+            "abductive",
+            "systems",
+            "constraint",
+            "redblue",
+            "dialectic",
+            "analogical",
+            "scientific",
+            "divergent",
+            "exec",
+            "razors.apply",
+            "self_explain",
+            "socratic",
+        ] as any, [...DEFAULT_RAZORS]);
+
+        const nextId = selector.primary_mode.id as RouterStep["mode"]; // prefer the selector suggestion
+        if (nextId && nextId !== "socratic") {
+            const toolMap: Record<string, string> = {
+                abductive: "abductive.hypothesize",
+                systems: "systems.map",
+                constraint: "constraint.solve",
+                redblue: "redblue.challenge",
+                dialectic: "dialectic.tas",
+                analogical: "analogical.map",
+                scientific: "reasoning.scientific",
+                divergent: "reasoning.divergent_convergent",
+                exec: "exec.run",
+                "razors.apply": "razors.apply",
+                self_explain: "reasoning.self_explain",
+                socratic: "socratic.inquire",
+            } as const;
+
+            push({
+                mode: nextId,
+                tool: toolMap[nextId] ?? undefined,
+                why: selector.primary_mode.reason ?? "Selector heuristic recommendation",
+                args: {},
+            });
+        } else {
+            push({
+                mode: "scientific",
+                tool: "reasoning.scientific",
+                why: "Structure the next investigative steps when no other heuristic fired",
+                args: { allow_tools: true },
+            });
+        }
     }
 
     return {

@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { parseModel } from "../lib/dsl.js";
 import { init } from "z3-solver";
+const InputSchema = z.object({
+    model_json: z.string().describe("JSON with {variables, constraints, optimize?}"),
+});
+const inputShape = InputSchema.shape;
 function serializeModel(entries) {
     const model = {};
     for (const [name, value] of entries) {
@@ -11,11 +15,7 @@ function serializeModel(entries) {
     return model;
 }
 export function registerConstraint(server) {
-    server.registerTool("constraint.solve", {
-        title: "Constraint solver (Z3)",
-        description: "Solve constraints using Z3. Input mini-DSL as JSON (variables, constraints, optional optimize).",
-        inputSchema: { model_json: z.string().describe("JSON with {variables, constraints, optimize?}") },
-    }, async ({ model_json }) => {
+    const handler = async ({ model_json }) => {
         let req;
         try {
             req = parseModel(model_json);
@@ -25,32 +25,11 @@ export function registerConstraint(server) {
                 content: [
                     {
                         type: "text",
-                        text: JSON.stringify({ error: e?.message || "Invalid model_json" }, null, 2),
+                        text: JSON.stringify({ error: e?.message ?? "Invalid model_json" }, null, 2),
                     },
                 ],
             };
         }
-        // Accept simple infix like "x > 5" by translating to SMT-LIB when possible
-        const translatedConstraints = req.constraints.map((c) => {
-            const m = c.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*(==|!=|>=|<=|>|<)\s*(-?\d+(?:\.\d+)?)\s*$/);
-            if (!m)
-                return c; // leave as-is
-            const [, left, op, right] = m;
-            const opMap = {
-                ">": ">",
-                "<": "<",
-                ">=": ">=",
-                "<=": "<=",
-                "==": "=",
-                "!=": "distinct",
-            };
-            const smt = opMap[op];
-            if (!smt)
-                return c;
-            if (smt === "distinct")
-                return `(distinct ${left} ${right})`;
-            return `(${smt} ${left} ${right})`;
-        });
         try {
             const { Context } = await init();
             const ctx = Context("reason-suite-constraint");
@@ -69,7 +48,7 @@ export function registerConstraint(server) {
                     variableSymbols[variable.name] = Bool.const(variable.name);
                 }
             }
-            const assertions = translatedConstraints.map((c) => `(assert ${c})`);
+            const assertions = req.constraints.map((c) => `(assert ${c})`);
             const baseScript = [...declarations, ...assertions].join("\n");
             if (req.optimize && req.optimize.objective) {
                 const opt = new Optimize();
@@ -118,5 +97,10 @@ export function registerConstraint(server) {
             const message = err?.message ?? "Solver error";
             return { content: [{ type: "text", text: JSON.stringify({ error: message }, null, 2) }] };
         }
-    });
+    };
+    server.registerTool("constraint.solve", {
+        title: "Constraint solver (Z3)",
+        description: "Solve constraints using Z3. Input mini-DSL as JSON (variables, constraints, optional optimize).",
+        inputSchema: inputShape,
+    }, handler);
 }

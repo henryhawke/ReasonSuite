@@ -17,9 +17,9 @@ export function registerAnalogicalPrompts(server: McpServer): void {
     ) => ({
         messages: [
             {
-                role: "user",
+                role: "user" as const,
                 content: {
-                    type: "text",
+                    type: "text" as const,
                     text: `Build a structural analogy from SOURCE to TARGET.\n\nSOURCE: ${source_domain}\nTARGET: ${target_problem}\nCONSTRAINTS: ${constraints ?? ""}\n\nReturn JSON mapping, shared_relations, mismatches, transferable_insights, failure_modes.`,
                 },
             },

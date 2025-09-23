@@ -1,14 +1,33 @@
 import { z } from "zod";
+import { DEFAULT_RAZORS, summarizeRazors } from "../lib/razors.js";
+import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
+const InputSchema = z.object({
+    observations: z.string(),
+    k: z.number().int().min(2).max(10).default(4),
+    apply_razors: z.array(z.string()).default([...DEFAULT_RAZORS]),
+});
+const inputShape = InputSchema.shape;
+const OutputSchema = z
+    .object({
+    hypotheses: z
+        .array(z.object({
+        id: z.string(),
+        statement: z.string(),
+        rationale: z.string(),
+        scores: z.object({
+            prior_plausibility: z.number(),
+            explanatory_power: z.number(),
+            simplicity_penalty: z.number(),
+            testability: z.number(),
+            overall: z.number(),
+        }),
+    }))
+        .default([]),
+    experiments_or_evidence: z.array(z.string()).default([]),
+    notes: z.string().optional(),
+})
+    .extend({ meta: ReasoningMetadataSchema.optional() });
 export function registerAbductive(server) {
-    const config = {
-        title: "Abductive hypotheses",
-        description: "Generate k candidate hypotheses and rank by plausibility, explanatory power, simplicity (MDL proxy), and testability.",
-        inputSchema: {
-            observations: z.string(),
-            k: z.number().int().min(2).max(10).default(4),
-            apply_razors: z.array(z.string()).default(["MDL", "Hitchens", "Sagan", "Popper"]),
-        },
-    };
     const handler = async ({ observations, k, apply_razors }) => {
         const prompt = `Observations:\n${observations}
 
@@ -19,7 +38,9 @@ Generate ${k} abductive hypotheses. Score each on:
 - testability (0-1)
 - overall_score = prior_plausibility + explanatory_power + testability - simplicity_penalty
 
-Apply razors: ${apply_razors.join(", ")}.
+Apply the following razors and reference them explicitly where relevant:
+${summarizeRazors(apply_razors)}
+
 Return strict JSON only:
 {
  "hypotheses": [
@@ -28,11 +49,34 @@ Return strict JSON only:
  "experiments_or_evidence": ["test1"],
  "notes": "..."
 }`;
-        const resp = await server.server.createMessage({
-            messages: [{ role: "user", content: { type: "text", text: prompt } }],
+        const { text } = await sampleStructuredJson({
+            server,
+            prompt,
             maxTokens: 900,
+            schema: OutputSchema,
+            fallback: () => ({
+                hypotheses: Array.from({ length: Math.min(k, 3) }, (_, idx) => ({
+                    id: `H${idx + 1}`,
+                    statement: `Coherent explanation candidate ${idx + 1}`,
+                    rationale: "Sketch causal story consistent with observations.",
+                    scores: {
+                        prior_plausibility: 0.5 - idx * 0.05,
+                        explanatory_power: 0.6 - idx * 0.05,
+                        simplicity_penalty: 0.2 + idx * 0.1,
+                        testability: 0.6 - idx * 0.05,
+                        overall: 1.5 - idx * 0.1,
+                    },
+                })),
+                experiments_or_evidence: ["Design discriminating test or gather missing data."],
+                notes: "Deterministic fallback applied; rerun with sampling for richer detail.",
+            }),
         });
-        return { content: [{ type: "text", text: resp.content.type === "text" ? resp.content.text : "{}" }] };
+        return { content: [{ type: "text", text }] };
+    };
+    const config = {
+        title: "Abductive hypotheses",
+        description: "Generate k candidate hypotheses and rank by plausibility, explanatory power, simplicity (MDL proxy), and testability.",
+        inputSchema: inputShape,
     };
     server.registerTool("abductive.hypothesize", config, handler);
     server.registerTool("abductive_hypothesize", config, handler);

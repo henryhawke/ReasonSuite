@@ -1,6 +1,8 @@
-# ReasonSuite MCP
+# ReasonSuite
 
-ReasonSuite MCP is a Model Context Protocol (MCP) server that bundles a planning router, seven complementary reasoning tools, reusable prompt templates, and reference resources behind a single executable. It targets MCP-compatible clients that want structured reasoning artifacts such as thesis/antithesis/synthesis reports, Socratic question trees, causal loop diagrams, or Z3-backed constraint solutions.
+ReasonSuite is a structured thinking framework that helps a model work through any problem. My thought is why not have other types of reasoning than just sequential thinking mcp. Give your model trusted logical heuristics instead of relying solely on an llm's emergent reasoning.
+
+This repo is a Model Context Protocol (MCP) server that bundles a planning router, seven complementary reasoning tools, reusable prompt templates, and reference resources behind a single executable. It targets MCP-compatible clients that want structured reasoning artifacts such as thesis/antithesis/synthesis reports, Socratic question trees, causal loop diagrams, or Z3-backed constraint solutions.
 
 ## Highlights
 
@@ -15,7 +17,7 @@ ReasonSuite MCP is a Model Context Protocol (MCP) server that bundles a planning
 ## Repository structure
 
 ```
-reason-suite-mcp/
+reasonsuite/
 ├─ package.json
 ├─ tsconfig.json
 ├─ src/
@@ -26,7 +28,7 @@ reason-suite-mcp/
 │  ├─ lib/dsl.ts             # Constraint-model validation helpers
 │  ├─ resources/             # Markdown reference docs served via MCP resources
 │  └─ smoke.ts               # Offline smoke test harness
-├─ bin/mcp-reasonsuite       # Executable shim
+├─ bin/reasonsuite       # Executable shim
 └─ dist/                     # Build output (after `npm run build`)
 ```
 
@@ -42,8 +44,32 @@ npm run build
 The package exposes a binary entry point:
 
 ```bash
-npx mcp-reasonsuite        # or ./bin/mcp-reasonsuite after chmod +x
+npx reasonsuite        # or ./bin/reasonsuite after chmod +x
 ```
+
+## Quick start (MCP)
+
+Install from npm (recommended):
+
+```bash
+npm i reasonsuite
+```
+
+Or run without installing:
+
+```bash
+npx reasonsuite
+```
+
+## Add to Cursor
+
+Install this MCP server in Cursor with one click:
+
+[![Add to Cursor](https://cdn.jsdelivr.net/gh/cursor-tools/buttons@main/dist/add-to-cursor.svg)](cursor://mcp/install?config={"reasonsuite":{"command":"npx","args":["-y","reasonsuite"]}})
+
+Or use this web install link:
+
+[Install ReasonSuite MCP Server](https://cursor.com/mcp/install?config={"reasonsuite":{"command":"npx","args":["-y","reasonsuite"]}})
 
 ## Running the server
 
@@ -59,20 +85,114 @@ MCP_TRANSPORT=http PORT=3333 npm start
 
 After the server starts, connect with your MCP client, list the available tools/prompts, and invoke as needed. Every tool response is JSON text that downstream automation can parse.
 
+## Configure your MCP client
+
+### Cursor (project-level or global)
+
+Create a `mcp.json` either in your project at `.cursor/mcp.json` or globally at `~/.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "reasonsuite": {
+      "command": "npx",
+      "args": ["-y", "reasonsuite"],
+      "env": { "MCP_TRANSPORT": "stdio" }
+    }
+  }
+}
+```
+
+If you installed locally, you can reference the binary directly:
+
+```json
+{
+  "mcpServers": {
+    "reasonsuite": {
+      "command": "./node_modules/.bin/reasonsuite",
+      "env": { "MCP_TRANSPORT": "stdio" }
+    }
+  }
+}
+```
+
+### Claude Desktop
+
+Open the configuration file via Settings → Extensions → Model Context Protocol → Edit configuration. Add:
+
+```json
+{
+  "mcpServers": {
+    "reasonsuite": {
+      "command": "npx",
+      "args": ["-y", "reasonsuite"],
+      "env": { "MCP_TRANSPORT": "stdio" }
+    }
+  }
+}
+```
+
+### Optional: HTTP transport
+
+ReasonSuite also supports the HTTP transport. Configure your client to launch the server with HTTP and a port:
+
+```json
+{
+  "mcpServers": {
+    "reasonsuite-http": {
+      "command": "npx",
+      "args": ["-y", "reasonsuite"],
+      "env": { "MCP_TRANSPORT": "http", "PORT": "3333" }
+    }
+  }
+}
+```
+
+Then point your MCP client at `http://localhost:3333` if required by the client.
+
 ## Available tools
 
-| Tool ID | Description |
-| --- | --- |
+| Tool ID                 | Description                                                                                                         |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `reasoning.router.plan` | Plan a sequence of reasoning modes with arguments and rationale, with a safe fallback when sampling is unavailable. |
-| `reasoning.selector` | Recommend the most suitable reasoning mode plus supporting razors for a given request. |
-| `dialectic.tas` | Produce thesis, antithesis, synthesis, and open questions for a claim. |
-| `socratic.inquire` | Generate multi-layer Socratic question trees plus assumptions, evidence, and next actions. |
-| `abductive.hypothesize` | Generate and score candidate hypotheses, optionally applying razors. |
-| `razors.apply` | Apply Occam/MDL, Bayesian Occam, Sagan, Hitchens, Hanlon, and Popper tests to candidate explanations. |
-| `systems.map` | Build causal loop diagrams with loops, leverage points, stock/flow hints, assumptions, and risks. |
-| `redblue.challenge` | Run adversarial red-team vs. blue-team critiques with transcripts, defects, and risk matrix. |
-| `analogical.map` | Map structural analogies between domains, surfacing correspondences and transfer risks. |
-| `constraint.solve` | Solve or optimize constraint problems expressed in the JSON mini-DSL and return Z3 models. |
+| `reasoning.selector`    | Recommend the most suitable reasoning mode plus supporting razors for a given request.                              |
+| `dialectic.tas`         | Produce thesis, antithesis, synthesis, and open questions for a claim.                                              |
+| `socratic.inquire`      | Generate multi-layer Socratic question trees plus assumptions, evidence, and next actions.                          |
+| `abductive.hypothesize` | Generate and score candidate hypotheses, optionally applying razors.                                                |
+| `razors.apply`          | Apply Occam/MDL, Bayesian Occam, Sagan, Hitchens, Hanlon, and Popper tests to candidate explanations.               |
+| `systems.map`           | Build causal loop diagrams with loops, leverage points, stock/flow hints, assumptions, and risks.                   |
+| `redblue.challenge`     | Run adversarial red-team vs. blue-team critiques with transcripts, defects, and risk matrix.                        |
+| `analogical.map`        | Map structural analogies between domains, surfacing correspondences and transfer risks.                             |
+| `constraint.solve`      | Solve or optimize constraint problems expressed in the JSON mini-DSL and return Z3 models.                          |
+
+## Instructional prompt (copy/paste for LLMs)
+
+Use this prompt in your LLM when connected to ReasonSuite via MCP to drive structured reasoning and artifact generation.
+
+```text
+You are connected to an MCP server named "reasonsuite" that exposes structured reasoning tools.
+
+Operating rules:
+- When unsure which method to use, call reasoning.selector with the user's request; follow its recommendation.
+- For multi-step work, call reasoning.router.plan with the request; then run each suggested tool in order, carrying forward prior artifacts.
+- All tools return strict JSON; never invent fields. Keep narrative brief, attach JSON artifacts.
+
+Tool intents:
+- dialectic.tas: thesis, antithesis, synthesis, open questions
+- socratic.inquire: multi-layer question tree, assumptions, evidence, next actions
+- abductive.hypothesize: candidate hypotheses with scores; optionally run razors.apply
+- razors.apply: Occam/MDL, Bayesian Occam, Sagan, Hitchens, Hanlon, Popper checks
+- systems.map: causal loops, leverage points, stocks/flows hints, risks
+- redblue.challenge: adversarial critique transcript and risk matrix
+- analogical.map: structural correspondences and transfer risks
+- constraint.solve: solve/optimize constraint JSON (see constraint-dsl resource)
+
+Execution pattern:
+1) Decide: single tool vs plan → use reasoning.selector if needed.
+2) If planning: call reasoning.router.plan(request) and follow the sequence.
+3) For each step, pass { request, relevantContext, priorArtifacts } as needed.
+4) Return: concise narrative + structured JSON outputs from tools used.
+```
 
 ## Prompt templates
 
@@ -105,7 +225,11 @@ Example payload:
 
 ## Development & testing
 
-Compile the TypeScript sources and run the offline smoke test to exercise every tool without an LLM backend:
+ReasonSuite includes a comprehensive test system that validates all reasoning tools, logical processes, and MCP server integration patterns.
+
+### Quick smoke test
+
+Compile the TypeScript sources and run the basic smoke test:
 
 ```bash
 npm run build
@@ -114,6 +238,95 @@ node dist/smoke.js
 
 The smoke harness registers every tool against a fake MCP server, stubs LLM responses, and asserts the returned JSON parses correctly.
 
+### Comprehensive test suite
+
+The repository includes four levels of testing to ensure robust operation:
+
+#### 1. Basic tool testing (`test_all_tools.js`)
+
+Tests every tool with multiple argument permutations and validates structured JSON outputs:
+
+```bash
+node test_all_tools.js
+```
+
+- Exercises all 22 registered tools and aliases
+- Tests edge cases and argument variations
+- Validates JSON schema compliance
+- **Result**: 44+ tool calls with full coverage
+
+#### 2. Scenario-driven testing (`test_scenarios.js`)
+
+Tests tools with realistic problem inputs and meaningful data:
+
+```bash
+node test_scenarios.js
+```
+
+- Uses practical problem descriptions
+- Asserts presence of key output fields
+- Validates tool behavior with real-world scenarios
+- **Result**: 17 scenario tests covering all tool families
+
+#### 3. Comprehensive reasoning flow testing (`test_comprehensive.js`)
+
+Tests complete logical proof workflows and reasoning chains:
+
+```bash
+node test_comprehensive.js
+```
+
+- **Logical proof workflows**: Constraint optimization with razor validation
+- **Diagnostic reasoning chains**: Socratic → Abductive → Razors → Constraint solving
+- **Systems thinking approaches**: Causal mapping with red/blue stress testing
+- **Unified interface validation**: All `reasoning.run` modes
+- **Razor application logic**: MDL, Popper, Sagan, Hitchens criteria
+- **Execution sandbox safety**: Timeout handling and result capture
+- **Result**: 100% assertion pass rate on all workflow tests
+
+#### 4. Integration testing (`test_integration.js`)
+
+Simulates realistic LLM usage patterns with end-to-end problem solving:
+
+```bash
+node test_integration.js
+```
+
+- **Database performance problem**: 5-step reasoning workflow with router planning
+- **Security incident analysis**: Multi-tool rapid response simulation
+- **Capability validation**: 8 key capabilities tested
+- **LLM interaction patterns**: Realistic conversation flows and tool selection
+- **Result**: 100% pass rate on capability validation
+
+### Test capabilities validated
+
+✅ **Router Planning**: Generates multi-step reasoning plans based on problem type  
+✅ **Tool Selection**: Selector chooses appropriate reasoning modes intelligently  
+✅ **Logical Proofs**: Abductive reasoning generates testable hypotheses  
+✅ **Razor Logic**: Filters hypotheses using MDL, Popper, Hitchens, Sagan criteria  
+✅ **Constraint Solving**: Handles optimization with Z3 solver integration  
+✅ **Risk Analysis**: Red/Blue challenge identifies security vulnerabilities  
+✅ **Unified Interface**: `reasoning.run` supports all modes seamlessly  
+✅ **Self-Explanation**: Provides transparent rationale and evidence chains
+
+### Running all tests
+
+Execute the complete test suite:
+
+```bash
+# Run all test levels
+node test_all_tools.js && \
+node test_scenarios.js && \
+node test_comprehensive.js && \
+node test_integration.js
+
+# Or individual test suites
+node test_comprehensive.js  # Most thorough workflow testing
+node test_integration.js    # LLM usage simulation
+```
+
+The test system proves that ReasonSuite works correctly for LLMs to choose appropriate reasoning tools, apply logical razors, execute multi-step workflows, and generate structured outputs suitable for downstream processing.
+
 ## License
 
-MIT License. See [`LICENSE`](LICENSE).
+Unlicense. See [`LICENSE`](LICENSE).

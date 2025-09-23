@@ -1,10 +1,12 @@
 import { z } from "zod";
+import { definePromptArgsShape } from "../lib/prompt.js";
+const ArgsSchema = z.object({
+    observations: z.string(),
+    k: z.string().optional(),
+});
+const argsShape = definePromptArgsShape(ArgsSchema.shape);
 export function registerAbductivePrompts(server) {
-    server.registerPrompt("abductive.hypotheses", {
-        title: "Abductive Hypotheses",
-        description: "k-best explanations with razors",
-        argsSchema: { observations: z.string(), k: z.string().optional() },
-    }, ({ observations, k }) => ({
+    const callback = ({ observations, k }, _extra) => ({
         messages: [
             {
                 role: "user",
@@ -14,5 +16,10 @@ export function registerAbductivePrompts(server) {
                 },
             },
         ],
-    }));
+    });
+    server.registerPrompt("abductive.hypotheses", {
+        title: "Abductive Hypotheses",
+        description: "k-best explanations with razors",
+        argsSchema: argsShape,
+    }, callback);
 }

@@ -1,5 +1,12 @@
 import { z } from "zod";
 import { Script, createContext } from "node:vm";
+const InputSchema = z.object({
+    code: z
+        .string()
+        .describe("JavaScript source to run. If the user provided fenced code, pass the content between the fences."),
+    timeout_ms: z.number().int().min(10).max(10_000).default(1500),
+});
+const inputShape = InputSchema.shape;
 function runInSandbox(code, timeoutMs) {
     const stdout = [];
     const stderr = [];
@@ -11,7 +18,6 @@ function runInSandbox(code, timeoutMs) {
     const sandbox = {
         console: sandboxConsole,
         print: (v) => stdout.push(String(v)),
-        // Provide a minimal set of globals; no access to require or process
         setTimeout,
         setInterval,
         clearTimeout,
@@ -35,21 +41,7 @@ function runInSandbox(code, timeoutMs) {
     return { stdout, stderr, result, timedOut };
 }
 export function registerExec(server) {
-    server.registerTool("exec.run", {
-        title: "Run sandboxed JavaScript code",
-        description: "Execute JavaScript code in a secure VM sandbox with a time limit. Captures print()/console.log output.",
-        inputSchema: {
-            code: z
-                .string()
-                .describe("JavaScript source to run. If the user provided fenced code, pass the content between the fences."),
-            timeout_ms: z.number().int().min(10).max(10_000).default(1500),
-        },
-        annotations: {
-            readOnlyHint: true,
-            idempotentHint: true,
-            openWorldHint: false,
-        },
-    }, async ({ code, timeout_ms }) => {
+    const handler = async ({ code, timeout_ms }) => {
         const result = runInSandbox(code, timeout_ms);
         const payload = {
             stdout: result.stdout,
@@ -57,6 +49,11 @@ export function registerExec(server) {
             result: result.result,
             timedOut: result.timedOut,
         };
-        return { content: [{ type: "text", text: JSON.stringify(payload) }] };
-    });
+        return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }] };
+    };
+    server.registerTool("exec.run", {
+        title: "Run sandboxed JavaScript code",
+        description: "Execute JavaScript code in a secure VM sandbox with a time limit. Captures print()/console.log output.",
+        inputSchema: inputShape,
+    }, handler);
 }

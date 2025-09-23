@@ -12,9 +12,9 @@ export function registerConstraintPrompts(server: McpServer): void {
     const callback: PromptCallback<typeof argsShape> = ({ model_json }, _extra) => ({
         messages: [
             {
-                role: "user",
+                role: "user" as const,
                 content: {
-                    type: "text",
+                    type: "text" as const,
                     text: `Solve constraints using Z3.\nInput JSON: ${model_json}\nReturn JSON {"status":"sat|unsat|unknown","model":{...}}`,
                 },
             },

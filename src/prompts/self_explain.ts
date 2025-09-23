@@ -13,9 +13,9 @@ export function registerSelfExplainPrompts(server: McpServer): void {
     const callback: PromptCallback<typeof argsShape> = ({ query, allow_citations }, _extra) => ({
         messages: [
             {
-                role: "user",
+                role: "user" as const,
                 content: {
-                    type: "text",
+                    type: "text" as const,
                     text: `Transparent Self-Explanation for: ${query}\nCitations allowed: ${allow_citations ?? "true"}\nReturn JSON with rationale, evidence, self_critique, revision.`,
                 },
             },

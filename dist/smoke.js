@@ -12,6 +12,7 @@ import { registerConstraint } from "./tools/constraint.js";
 import { registerScientific } from "./tools/scientific.js";
 import { registerSelfExplain } from "./tools/self_explain.js";
 import { registerDivergent } from "./tools/divergent.js";
+import { registerSelector } from "./tools/selector.js";
 class FakeServer {
     tools = new Map();
     prompts = new Map();
@@ -24,10 +25,16 @@ class FakeServer {
             if (t.includes("you are a planner")) {
                 payload = {
                     steps: [
-                        { mode: "socratic", why: "Scope", args: { depth: 2 } },
-                        { mode: "abductive", why: "Generate options", args: { k: 3 } },
+                        { mode: "socratic", tool: "socratic.inquire", why: "Scope", args: { depth: 2 } },
+                        {
+                            mode: "abductive",
+                            tool: "abductive.hypothesize",
+                            why: "Generate options",
+                            args: { k: 3, apply_razors: ["MDL", "Popper"] },
+                        },
+                        { mode: "razors.apply", tool: "razors.apply", why: "Prune", args: { razors: ["MDL", "Popper"] } },
                     ],
-                    notes: "smoke"
+                    notes: "smoke",
                 };
             }
             else if (t.includes("dialectic")) {
@@ -87,6 +94,44 @@ class FakeServer {
                     notes: "smoke"
                 };
             }
+            else if (t.includes("meta-selector")) {
+                payload = {
+                    primary_mode: {
+                        id: "socratic",
+                        label: "Socratic Inquiry",
+                        confidence: 0.62,
+                        reason: "Ambiguous scope cues benefit from clarification",
+                    },
+                    supporting_modes: [
+                        {
+                            id: "abductive",
+                            label: "Abductive Hypothesis Ranking",
+                            score: 0.45,
+                            reason: "Investigative task needs candidate explanations",
+                        },
+                    ],
+                    razor_stack: [
+                        {
+                            id: "MDL",
+                            label: "Minimum Description Length",
+                            score: 0.52,
+                            reason: "Helps prune overfit hypotheses",
+                        },
+                    ],
+                    decision_path: [
+                        {
+                            observation: "Detected diagnostic language",
+                            implication: "Prioritize abductive reasoning",
+                        },
+                        {
+                            observation: "Request lacks clear success criteria",
+                            implication: "Begin with Socratic clarification",
+                        },
+                    ],
+                    next_action: "Run Socratic questions then abductive ranking with MDL razor.",
+                    notes: "smoke",
+                };
+            }
             else if (t.includes("Scientific Analytic Framework")) {
                 payload = {
                     decomposition: ["understand problem", "identify constraints"],
@@ -134,6 +179,7 @@ async function run() {
     registerScientific(server);
     registerSelfExplain(server);
     registerDivergent(server);
+    registerSelector(server);
     async function call(name, args, validate) {
         const h = server.tools.get(name);
         if (!h)
@@ -142,6 +188,9 @@ async function run() {
         const text = Array.isArray(res?.content) ? res.content[0]?.text ?? res.content[0]?.contents?.[0]?.text : res?.content?.text;
         const obj = JSON.parse(text);
         validate(obj);
+        if (obj?.meta?.source && !["model", "fallback"].includes(obj.meta.source)) {
+            throw new Error(`Unexpected meta.source: ${obj.meta.source}`);
+        }
         console.log(`OK: ${name}`);
     }
     await call("reasoning.router.plan", { task: "test", maxSteps: 3 }, (o) => { if (!Array.isArray(o.steps))
@@ -154,6 +203,10 @@ async function run() {
         throw new Error("abductive"); });
     await call("razors.apply", { candidates_json: "[{\"id\":\"H1\"}]", razors: ["MDL"] }, (o) => { if (!Array.isArray(o.results))
         throw new Error("razors"); });
+    await call("reasoning.selector", { request: "Investigate outage root cause", context: "Services intermittently failing" }, (o) => {
+        if (!o.primary_mode?.id || !Array.isArray(o.razor_stack))
+            throw new Error("selector");
+    });
     await call("systems.map", { variables: ["a", "b"], context: "ctx" }, (o) => { if (!o.mermaid)
         throw new Error("systems"); });
     await call("redblue.challenge", { proposal: "P", rounds: 1, focus: ["safety"] }, (o) => { if (!Array.isArray(o.rounds))

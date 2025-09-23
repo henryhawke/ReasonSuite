@@ -259,7 +259,7 @@ function clampScore(value: number): number {
     return Math.max(0, Math.min(1, Number(value.toFixed(2))));
 }
 
-function buildFallback(
+export function buildFallback(
     request: string,
     context: string | undefined,
     modes: ModeId[],
@@ -428,12 +428,12 @@ function buildFallback(
 
     const nextAction = supporting.length
         ? `Lead with ${primary.label} then consider ${supporting[0]!.label}${razorScores.length ? ` and apply ${razorScores
-              .map((r) => r.label)
-              .slice(0, 2)
-              .join("/")} razors` : ""}.`
+            .map((r) => r.label)
+            .slice(0, 2)
+            .join("/")} razors` : ""}.`
         : razorScores.length
-          ? `Lead with ${primary.label} and stack ${razorScores.map((r) => r.label).slice(0, 2).join("/")} razors.`
-          : `Lead with ${primary.label}.`;
+            ? `Lead with ${primary.label} and stack ${razorScores.map((r) => r.label).slice(0, 2).join("/")} razors.`
+            : `Lead with ${primary.label}.`;
 
     return {
         primary_mode: {
@@ -455,7 +455,7 @@ function buildFallback(
     };
 }
 
-function rankRazorsFallback(opts: {
+export function rankRazorsFallback(opts: {
     request: string;
     context: string | undefined;
     razors: string[];

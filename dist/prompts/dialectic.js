@@ -1,10 +1,12 @@
 import { z } from "zod";
+import { definePromptArgsShape } from "../lib/prompt.js";
+const ArgsSchema = z.object({
+    claim: z.string(),
+    context: z.string().optional(),
+});
+const argsShape = definePromptArgsShape(ArgsSchema.shape);
 export function registerDialecticPrompts(server) {
-    server.registerPrompt("dialectic.tas", {
-        title: "Dialectic TAS",
-        description: "Thesis–Antithesis–Synthesis template",
-        argsSchema: { claim: z.string(), context: z.string().optional() },
-    }, ({ claim, context }) => ({
+    const callback = ({ claim, context }, _extra) => ({
         messages: [
             {
                 role: "user",
@@ -18,5 +20,10 @@ Output JSON with thesis, antithesis, synthesis (proposal, assumptions, tradeoffs
                 },
             },
         ],
-    }));
+    });
+    server.registerPrompt("dialectic.tas", {
+        title: "Dialectic TAS",
+        description: "Thesis–Antithesis–Synthesis template",
+        argsSchema: argsShape,
+    }, callback);
 }

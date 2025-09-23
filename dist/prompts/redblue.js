@@ -1,14 +1,13 @@
 import { z } from "zod";
+import { definePromptArgsShape } from "../lib/prompt.js";
+const ArgsSchema = z.object({
+    proposal: z.string(),
+    rounds: z.string().optional(),
+    focus: z.string().optional(),
+});
+const argsShape = definePromptArgsShape(ArgsSchema.shape);
 export function registerRedBluePrompts(server) {
-    server.registerPrompt("redblue.challenge", {
-        title: "Red/Blue Challenge",
-        description: "Adversarial critique with risk matrix",
-        argsSchema: {
-            proposal: z.string(),
-            rounds: z.string().optional(),
-            focus: z.string().optional(),
-        },
-    }, ({ proposal, rounds, focus }) => ({
+    const callback = ({ proposal, rounds, focus }, _extra) => ({
         messages: [
             {
                 role: "user",
@@ -18,5 +17,10 @@ export function registerRedBluePrompts(server) {
                 },
             },
         ],
-    }));
+    });
+    server.registerPrompt("redblue.challenge", {
+        title: "Red/Blue Challenge",
+        description: "Adversarial critique with risk matrix",
+        argsSchema: argsShape,
+    }, callback);
 }

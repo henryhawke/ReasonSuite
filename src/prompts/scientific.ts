@@ -14,9 +14,9 @@ export function registerScientificPrompts(server: McpServer): void {
     const callback: PromptCallback<typeof argsShape> = ({ goal, context, allow_tools }, _extra) => ({
         messages: [
             {
-                role: "user",
+                role: "user" as const,
                 content: {
-                    type: "text",
+                    type: "text" as const,
                     text: `You are an agent following a Scientific Analytic Framework.\nGoal: ${goal}\nContext: ${context ?? ""}\nAllow tools: ${allow_tools ?? "true"}\nReturn JSON with decomposition, hypotheses, tests, verification, answer.`,
                 },
             },

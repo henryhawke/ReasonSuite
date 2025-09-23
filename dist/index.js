@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import fs from "node:fs/promises";
+import { createServer } from "node:http";
 import path from "node:path";
 // Tools
 import { registerDialectic } from "./tools/dialectic.js";
@@ -13,6 +14,11 @@ import { registerAnalogical } from "./tools/analogical.js";
 import { registerConstraint } from "./tools/constraint.js";
 import { registerRazors } from "./tools/razors.js";
 import { registerRouter } from "./router/router.js";
+import { registerScientific } from "./tools/scientific.js";
+import { registerSelfExplain } from "./tools/self_explain.js";
+import { registerDivergent } from "./tools/divergent.js";
+import { registerExec } from "./tools/exec.js";
+import { registerSelector } from "./tools/selector.js";
 // Prompts
 import { registerDialecticPrompts } from "./prompts/dialectic.js";
 import { registerSocraticPrompts } from "./prompts/socratic.js";
@@ -21,34 +27,25 @@ import { registerSystemsPrompts } from "./prompts/systems.js";
 import { registerRedBluePrompts } from "./prompts/redblue.js";
 import { registerAnalogicalPrompts } from "./prompts/analogical.js";
 import { registerConstraintPrompts } from "./prompts/constraint.js";
-import { registerScientific } from "./tools/scientific.js";
-import { registerSelfExplain } from "./tools/self_explain.js";
-import { registerDivergent } from "./tools/divergent.js";
 import { registerScientificPrompts } from "./prompts/scientific.js";
 import { registerSelfExplainPrompts } from "./prompts/self_explain.js";
 import { registerDivergentPrompts } from "./prompts/divergent.js";
-import { registerExec } from "./tools/exec.js";
-import { registerReasoning } from "./tools/reasoning.js";
-const server = new McpServer({ name: "reason-suite-mcp", version: "0.1.0" }, {
-    instructions: "Use reasoning tools proactively. If the user goal is unclear or multi-step, first call 'reasoning.router.plan'. Then: use 'socratic.inquire' for scoping questions; 'abductive.hypothesize' to generate hypotheses; 'razors.apply' to prune options; 'analogical.map' for cross-domain transfer; 'systems.map' for many interacting variables; 'constraint.solve' for numeric/logical constraints; 'redblue.challenge' for adversarial evaluation; 'reasoning.scientific' for structured decomposition/testing; 'reasoning.self_explain' for rationale and critique. Prefer read-only, idempotent tools by default. Use 'exec.run' only for small, safe calculations in a sandbox.",
-});
+const server = new McpServer({ name: "reasonsuite", version: "1.0.0" });
 // Register tools
 registerRouter(server);
-registerReasoning(server);
+registerRazors(server);
+registerDialectic(server);
+registerSocratic(server);
+registerAbductive(server);
+registerSystems(server);
+registerRedBlue(server);
+registerAnalogical(server);
 registerConstraint(server);
+registerScientific(server);
+registerSelfExplain(server);
+registerDivergent(server);
 registerExec(server);
-if (process.env.REASONSUITE_ENABLE_LEGACY === "1") {
-    registerRazors(server);
-    registerDialectic(server);
-    registerSocratic(server);
-    registerAbductive(server);
-    registerSystems(server);
-    registerRedBlue(server);
-    registerAnalogical(server);
-    registerScientific(server);
-    registerSelfExplain(server);
-    registerDivergent(server);
-}
+registerSelector(server);
 // Register prompts
 registerDialecticPrompts(server);
 registerSocraticPrompts(server);
@@ -67,15 +64,34 @@ async function addResource(file, title, description) {
 await addResource("razors.md", "Reasoning Razors", "Occam/MDL, Bayesian Occam, Sagan, Hitchens, Hanlon, Popper");
 await addResource("systems-cheatsheet.md", "Systems Thinking Cheatsheet", "Causal loops, stocks/flows, leverage points");
 await addResource("constraint-dsl.md", "Constraint DSL", "Mini-DSL compiled to Z3");
+await addResource("master-prompt.md", "ReasonSuite Master Prompt", "Master prompt and tool snippets");
 const mode = process.env.MCP_TRANSPORT ?? "stdio";
 if (mode === "http") {
     const port = Number(process.env.PORT ?? 3333);
-    const transport = new StreamableHTTPServerTransport({ port });
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+    const httpServer = createServer(async (req, res) => {
+        try {
+            await transport.handleRequest(req, res);
+        }
+        catch (err) {
+            const message = err?.message ?? "Internal server error";
+            res.writeHead(500, { "content-type": "application/json" }).end(JSON.stringify({ jsonrpc: "2.0", error: { code: -32000, message }, id: null }));
+            console.error("Transport error", err);
+        }
+    });
+    transport.onclose = () => {
+        httpServer.close((err) => {
+            if (err) {
+                console.error("Failed to close HTTP server", err);
+            }
+        });
+    };
     await server.connect(transport);
-    console.log("ReasonSuite MCP server listening on HTTP " + port);
+    await new Promise((resolve) => httpServer.listen(port, resolve));
+    console.log(`ReasonSuite server listening on HTTP ${port}`);
 }
 else {
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    console.log("ReasonSuite MCP server on stdio");
+    console.log("ReasonSuite server on stdio");
 }

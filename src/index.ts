@@ -33,7 +33,7 @@ import { registerScientificPrompts } from "./prompts/scientific.js";
 import { registerSelfExplainPrompts } from "./prompts/self_explain.js";
 import { registerDivergentPrompts } from "./prompts/divergent.js";
 
-const server = new McpServer({ name: "reason-suite-mcp", version: "0.1.0" });
+const server = new McpServer({ name: "reasonsuite", version: "1.0.0" });
 
 // Register tools
 registerRouter(server);
@@ -76,6 +76,7 @@ async function addResource(file: string, title: string, description: string) {
 await addResource("razors.md", "Reasoning Razors", "Occam/MDL, Bayesian Occam, Sagan, Hitchens, Hanlon, Popper");
 await addResource("systems-cheatsheet.md", "Systems Thinking Cheatsheet", "Causal loops, stocks/flows, leverage points");
 await addResource("constraint-dsl.md", "Constraint DSL", "Mini-DSL compiled to Z3");
+await addResource("master-prompt.md", "ReasonSuite Master Prompt", "Master prompt and tool snippets");
 
 const mode = process.env.MCP_TRANSPORT ?? "stdio";
 
@@ -105,9 +106,9 @@ if (mode === "http") {
 
     await server.connect(transport);
     await new Promise<void>((resolve) => httpServer.listen(port, resolve));
-    console.log(`ReasonSuite MCP server listening on HTTP ${port}`);
+    console.log(`ReasonSuite server listening on HTTP ${port}`);
 } else {
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    console.log("ReasonSuite MCP server on stdio");
+    console.log("ReasonSuite server on stdio");
 }

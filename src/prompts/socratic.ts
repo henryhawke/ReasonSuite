@@ -13,9 +13,9 @@ export function registerSocraticPrompts(server: McpServer): void {
     const callback: PromptCallback<typeof argsShape> = ({ topic, depth }, _extra) => ({
         messages: [
             {
-                role: "user",
+                role: "user" as const,
                 content: {
-                    type: "text",
+                    type: "text" as const,
                     text: `Produce a ${depth ?? "3"}-layer Socratic question tree for: ${topic}
 Include assumptions_to_test, evidence_to_collect, next_actions. Output JSON.`,
                 },

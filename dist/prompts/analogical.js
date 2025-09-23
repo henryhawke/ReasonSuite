@@ -1,10 +1,13 @@
 import { z } from "zod";
+import { definePromptArgsShape } from "../lib/prompt.js";
+const ArgsSchema = z.object({
+    source_domain: z.string(),
+    target_problem: z.string(),
+    constraints: z.string().optional(),
+});
+const argsShape = definePromptArgsShape(ArgsSchema.shape);
 export function registerAnalogicalPrompts(server) {
-    server.registerPrompt("analogical.map", {
-        title: "Analogical Mapping",
-        description: "Map structure from source to target",
-        argsSchema: { source_domain: z.string(), target_problem: z.string(), constraints: z.string().optional() },
-    }, ({ source_domain, target_problem, constraints }) => ({
+    const callback = ({ source_domain, target_problem, constraints }, _extra) => ({
         messages: [
             {
                 role: "user",
@@ -14,5 +17,10 @@ export function registerAnalogicalPrompts(server) {
                 },
             },
         ],
-    }));
+    });
+    server.registerPrompt("analogical.map", {
+        title: "Analogical Mapping",
+        description: "Map structure from source to target",
+        argsSchema: argsShape,
+    }, callback);
 }

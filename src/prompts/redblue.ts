@@ -14,9 +14,9 @@ export function registerRedBluePrompts(server: McpServer): void {
     const callback: PromptCallback<typeof argsShape> = ({ proposal, rounds, focus }, _extra) => ({
         messages: [
             {
-                role: "user",
+                role: "user" as const,
                 content: {
-                    type: "text",
+                    type: "text" as const,
                     text: `Conduct ${rounds ?? "2"} rounds of Red (attack) vs Blue (defense) on:\n${proposal}\n\nFocus areas: ${focus ?? "safety,bias,hallucination,security,privacy"}. Return JSON transcript, defects, risk_matrix, final_guidance.`,
                 },
             },

@@ -1,10 +1,13 @@
 import { z } from "zod";
+import { definePromptArgsShape } from "../lib/prompt.js";
+const ArgsSchema = z.object({
+    prompt: z.string(),
+    k: z.string().optional(),
+    criteria: z.string().optional(),
+});
+const argsShape = definePromptArgsShape(ArgsSchema.shape);
 export function registerDivergentPrompts(server) {
-    server.registerPrompt("reasoning.divergent_convergent", {
-        title: "Divergent–Convergent",
-        description: "Brainstorm then evaluate & synthesize",
-        argsSchema: { prompt: z.string(), k: z.string().optional(), criteria: z.string().optional() },
-    }, ({ prompt, k, criteria }) => ({
+    const callback = ({ prompt, k, criteria }, _extra) => ({
         messages: [
             {
                 role: "user",
@@ -14,5 +17,10 @@ export function registerDivergentPrompts(server) {
                 },
             },
         ],
-    }));
+    });
+    server.registerPrompt("reasoning.divergent_convergent", {
+        title: "Divergent–Convergent",
+        description: "Brainstorm then evaluate & synthesize",
+        argsSchema: argsShape,
+    }, callback);
 }

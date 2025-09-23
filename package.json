@@ -1,9 +1,9 @@
 {
-    "name": "@henryhawke/reasonsuite",
-    "version": "0.1.1",
+    "name": "reasonsuite",
+    "version": "1.0.1",
     "type": "module",
     "bin": {
-        "mcp-reasonsuite": "bin/mcp-reasonsuite"
+        "reasonsuite": "bin/reasonsuite"
     },
     "scripts": {
         "build": "tsc -p tsconfig.json",
@@ -14,8 +14,9 @@
         "@modelcontextprotocol/sdk": "^1.18.1",
         "yaml": "^2.8.1",
         "z3-solver": "^4.15.3",
-        "zod": "^4.1.9"
+        "zod": "^4.1.11"
     },
+    "license": "Unlicense",
     "engines": {
         "node": ">=18"
     },
