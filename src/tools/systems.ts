@@ -1,6 +1,5 @@
 import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { ZodRawShape } from "zod";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
 const InputSchema = z.object({
@@ -8,10 +7,10 @@ const InputSchema = z.object({
     context: z.string().optional(),
 });
 
-const inputShape = InputSchema.shape as ZodRawShape;
+const inputSchema = InputSchema as any;
 
 type InputArgs = z.output<typeof InputSchema>;
-type InputShape = typeof inputShape;
+type InputShape = typeof inputSchema;
 
 const OutputSchema = z
     .object({
@@ -27,7 +26,7 @@ const OutputSchema = z
     .extend({ meta: ReasoningMetadataSchema.optional() });
 
 export function registerSystems(server: McpServer): void {
-    const handler: ToolCallback<InputShape> = async ({ variables, context }) => {
+    const handler = async ({ variables, context }: any) => {
         const prompt = `Build a concise causal loop diagram (CLD) for the system below.
 Variables: ${variables.join(", ") || "(discover reasonable variables)"}
 Context: ${context ?? ""}
@@ -66,9 +65,10 @@ Return strict JSON only:
     const config = {
         title: "Systems map (CLD)",
         description: "Create a causal loop diagram (Mermaid) with candidate reinforcing/balancing loops and leverage points.",
-        inputSchema: inputShape,
+        inputSchema,
     };
 
-    server.registerTool("systems.map", config, handler);
-    server.registerTool("systems_map", config, handler);
+    const wrap = (h: any) => (args: any, _extra: any) => h(args);
+    server.registerTool("systems.map", config, wrap(handler));
+    server.registerTool("systems_map", config, wrap(handler));
 }

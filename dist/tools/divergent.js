@@ -5,7 +5,7 @@ const InputSchema = z.object({
     k: z.number().int().min(2).max(10).default(5),
     criteria: z.array(z.string()).default(["novelty", "consistency", "relevance"]),
 });
-const inputShape = InputSchema.shape;
+const inputSchema = InputSchema;
 const OutputSchema = z
     .object({
     divergent: z.array(z.string()).default([]),
@@ -39,7 +39,20 @@ Return strict JSON only:
             server,
             prompt: text,
             maxTokens: 900,
-            schema: OutputSchema,
+            schema: z
+                .object({
+                divergent: z.array(z.string()).default([]),
+                scores: z
+                    .array(z.object({
+                    id: z.number().int(),
+                    by: z.record(z.string(), z.number()),
+                    notes: z.string().optional(),
+                }))
+                    .default([]),
+                winner: z.object({ id: z.number().int(), why: z.string() }),
+                synthesis: z.string(),
+            })
+                .extend({ meta: ReasoningMetadataSchema.optional() }),
             fallback: () => ({
                 divergent: Array.from({ length: Math.min(k, 5) }, (_, idx) => `Idea ${idx + 1} for ${prompt}`),
                 scores: [
@@ -58,7 +71,7 @@ Return strict JSON only:
     const config = {
         title: "Divergent–Convergent Creative",
         description: "Generate multiple options (divergent), then evaluate and converge with criteria (convergent).",
-        inputSchema: inputShape,
+        inputSchema,
     };
     server.registerTool("reasoning.divergent_convergent", config, handler);
     server.registerTool("reasoning_divergent_convergent", config, handler);

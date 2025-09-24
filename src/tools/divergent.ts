@@ -1,7 +1,6 @@
 import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
-import type { ZodRawShape } from "zod";
 
 const InputSchema = z.object({
     prompt: z.string(),
@@ -9,10 +8,10 @@ const InputSchema = z.object({
     criteria: z.array(z.string()).default(["novelty", "consistency", "relevance"]),
 });
 
-const inputShape = InputSchema.shape as ZodRawShape;
+const inputSchema = InputSchema as any;
 
 type InputArgs = z.output<typeof InputSchema>;
-type InputShape = typeof inputShape;
+type InputShape = typeof inputSchema;
 
 const OutputSchema = z
     .object({
@@ -32,7 +31,7 @@ const OutputSchema = z
     .extend({ meta: ReasoningMetadataSchema.optional() });
 
 export function registerDivergent(server: McpServer): void {
-    const handler: ToolCallback<InputShape> = async ({ prompt, k, criteria }) => {
+    const handler = async ({ prompt, k, criteria }: any) => {
         const activeCriteria = criteria?.length ? criteria : ["novelty", "consistency", "relevance"];
 
         const text = `Divergent then Convergent.
@@ -51,15 +50,28 @@ Return strict JSON only:
             server,
             prompt: text,
             maxTokens: 900,
-            schema: OutputSchema,
+            schema: z
+                .object({
+                    divergent: z.array(z.string()).default([]),
+                    scores: z
+                        .array(
+                            z.object({
+                                id: z.number().int(),
+                                by: z.record(z.string(), z.number()),
+                                notes: z.string().optional(),
+                            })
+                        )
+                        .default([]),
+                    winner: z.object({ id: z.number().int(), why: z.string() }),
+                    synthesis: z.string(),
+                })
+                .extend({ meta: ReasoningMetadataSchema.optional() }),
             fallback: () => ({
                 divergent: Array.from({ length: Math.min(k, 5) }, (_, idx) => `Idea ${idx + 1} for ${prompt}`),
                 scores: [
                     {
                         id: 1,
-                        by: Object.fromEntries(
-                            activeCriteria.map((criterion: string) => [criterion, 0.7] as const)
-                        ),
+                        by: Object.fromEntries(activeCriteria.map((criterion: string) => [criterion, 0.7] as const)),
                         notes: "Deterministic fallback scoring.",
                     },
                 ],
@@ -73,7 +85,7 @@ Return strict JSON only:
     const config = {
         title: "Divergent–Convergent Creative",
         description: "Generate multiple options (divergent), then evaluate and converge with criteria (convergent).",
-        inputSchema: inputShape,
+        inputSchema,
     };
 
     server.registerTool("reasoning.divergent_convergent", config, handler);

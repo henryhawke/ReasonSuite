@@ -6,7 +6,7 @@ const ArgsSchema = z.object({
 });
 const argsShape = definePromptArgsShape(ArgsSchema.shape);
 export function registerSelfExplainPrompts(server) {
-    const callback = ({ query, allow_citations }, _extra) => ({
+    const callback = (({ query, allow_citations }, _extra) => ({
         messages: [
             {
                 role: "user",
@@ -16,7 +16,7 @@ export function registerSelfExplainPrompts(server) {
                 },
             },
         ],
-    });
+    }));
     server.registerPrompt("reasoning.self_explain", {
         title: "Self-Explanation",
         description: "Rationale + evidence + critique + revision",

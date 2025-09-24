@@ -1,6 +1,5 @@
 import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { ZodRawShape } from "zod";
 import { DEFAULT_RAZORS, summarizeRazors } from "../lib/razors.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
@@ -9,10 +8,10 @@ const InputSchema = z.object({
     razors: z.array(z.string()).default([...DEFAULT_RAZORS]),
 });
 
-const inputShape = InputSchema.shape as ZodRawShape;
+const inputSchema = InputSchema as any;
 
 type InputArgs = z.output<typeof InputSchema>;
-type InputShape = typeof inputShape;
+type InputShape = typeof inputSchema;
 
 const OutputSchema = z
     .object({
@@ -32,7 +31,7 @@ const OutputSchema = z
     .extend({ meta: ReasoningMetadataSchema.optional() });
 
 export function registerRazors(server: McpServer): void {
-    const handler: ToolCallback<InputShape> = async ({ candidates_json, razors }) => {
+    const handler = async ({ candidates_json, razors }: any) => {
         const prompt = `Candidates JSON:\n${candidates_json}
 Razors to apply (explain how each affects the verdict):
 ${summarizeRazors(razors)}
@@ -63,14 +62,26 @@ Return strict JSON only:
         return { content: [{ type: "text", text }] };
     };
 
+    const wrap = (h: any) => (args: any, _extra: any) => h(args);
     server.registerTool(
         "razors.apply",
         {
             title: "Apply reasoning razors",
             description:
                 "Given candidate explanations, apply Occam/MDL, Bayesian Occam, Sagan, Hitchens, Hanlon, Popper falsifiability to produce keep/drop recommendations.",
-            inputSchema: inputShape,
+            inputSchema,
         },
-        handler
+        wrap(handler)
+    );
+    // snake_case alias for wider client compatibility
+    server.registerTool(
+        "razors_apply",
+        {
+            title: "Apply reasoning razors",
+            description:
+                "Given candidate explanations, apply Occam/MDL, Bayesian Occam, Sagan, Hitchens, Hanlon, Popper falsifiability to produce keep/drop recommendations.",
+            inputSchema,
+        },
+        wrap(handler)
     );
 }

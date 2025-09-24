@@ -7,10 +7,10 @@ const ArgsSchema = z.object({
     allow_citations: z.string().optional(),
 });
 
-const argsShape = definePromptArgsShape(ArgsSchema.shape);
+const argsShape = definePromptArgsShape(ArgsSchema.shape as any);
 
 export function registerSelfExplainPrompts(server: McpServer): void {
-    const callback: PromptCallback<typeof argsShape> = ({ query, allow_citations }, _extra) => ({
+    const callback = (({ query, allow_citations }: any, _extra: any) => ({
         messages: [
             {
                 role: "user" as const,
@@ -20,14 +20,14 @@ export function registerSelfExplainPrompts(server: McpServer): void {
                 },
             },
         ],
-    });
+    })) as unknown as PromptCallback<any>;
 
     server.registerPrompt(
         "reasoning.self_explain",
         {
             title: "Self-Explanation",
             description: "Rationale + evidence + critique + revision",
-            argsSchema: argsShape,
+            argsSchema: argsShape as any,
         },
         callback
     );

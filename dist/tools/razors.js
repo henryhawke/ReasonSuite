@@ -5,7 +5,7 @@ const InputSchema = z.object({
     candidates_json: z.string().describe("JSON array or object of candidates"),
     razors: z.array(z.string()).default([...DEFAULT_RAZORS]),
 });
-const inputShape = InputSchema.shape;
+const inputSchema = InputSchema;
 const OutputSchema = z
     .object({
     results: z
@@ -51,9 +51,16 @@ Return strict JSON only:
         });
         return { content: [{ type: "text", text }] };
     };
+    const wrap = (h) => (args, _extra) => h(args);
     server.registerTool("razors.apply", {
         title: "Apply reasoning razors",
         description: "Given candidate explanations, apply Occam/MDL, Bayesian Occam, Sagan, Hitchens, Hanlon, Popper falsifiability to produce keep/drop recommendations.",
-        inputSchema: inputShape,
-    }, handler);
+        inputSchema,
+    }, wrap(handler));
+    // snake_case alias for wider client compatibility
+    server.registerTool("razors_apply", {
+        title: "Apply reasoning razors",
+        description: "Given candidate explanations, apply Occam/MDL, Bayesian Occam, Sagan, Hitchens, Hanlon, Popper falsifiability to produce keep/drop recommendations.",
+        inputSchema,
+    }, wrap(handler));
 }

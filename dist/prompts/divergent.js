@@ -7,16 +7,19 @@ const ArgsSchema = z.object({
 });
 const argsShape = definePromptArgsShape(ArgsSchema.shape);
 export function registerDivergentPrompts(server) {
-    const callback = ({ prompt, k, criteria }, _extra) => ({
-        messages: [
-            {
-                role: "user",
-                content: {
-                    type: "text",
-                    text: `Divergent (ideas) then Convergent (scoring).\nTask: ${prompt}\nK: ${k ?? "5"}\nCriteria: ${criteria ?? "novelty,consistency,relevance"}\nReturn JSON with divergent, scores, winner, synthesis.`,
+    const callback = ((extra) => {
+        const { prompt, k, criteria } = extra?.params ?? {};
+        return {
+            messages: [
+                {
+                    role: "user",
+                    content: {
+                        type: "text",
+                        text: `Divergent (ideas) then Convergent (scoring).\nTask: ${prompt}\nK: ${k ?? "5"}\nCriteria: ${criteria ?? "novelty,consistency,relevance"}\nReturn JSON with divergent, scores, winner, synthesis.`,
+                    },
                 },
-            },
-        ],
+            ],
+        };
     });
     server.registerPrompt("reasoning.divergent_convergent", {
         title: "Divergent–Convergent",

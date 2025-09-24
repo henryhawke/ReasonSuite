@@ -1,6 +1,5 @@
-import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { ZodRawShape } from "zod";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
 const InputSchema = z.object({
@@ -9,10 +8,10 @@ const InputSchema = z.object({
     constraints: z.string().optional(),
 });
 
-const inputShape = InputSchema.shape as ZodRawShape;
+const inputSchema = InputSchema as any;
 
 type InputArgs = z.output<typeof InputSchema>;
-type InputShape = typeof inputShape;
+type InputShape = typeof inputSchema;
 
 const OutputSchema = z
     .object({
@@ -33,7 +32,7 @@ const OutputSchema = z
     .extend({ meta: ReasoningMetadataSchema.optional() });
 
 export function registerAnalogical(server: McpServer): void {
-    const handler: ToolCallback<InputShape> = async ({ source_domain, target_problem, constraints }) => {
+    const handler = async ({ source_domain, target_problem, constraints }: any) => {
         const prompt = `Build a structural analogy from SOURCE to TARGET.
 
 SOURCE: ${source_domain}
@@ -74,9 +73,10 @@ JSON only:
         title: "Analogical mapping",
         description:
             "Map structure from a source domain to a target problem; identify correspondences, constraints, and transfer risks.",
-        inputSchema: inputShape,
+        inputSchema,
     };
 
     server.registerTool("analogical.map", config, handler);
     server.registerTool("analogical_map", config, handler);
+    server.registerTool("analogical-map", config, handler);
 }

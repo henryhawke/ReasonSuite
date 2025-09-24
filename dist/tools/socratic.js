@@ -5,7 +5,7 @@ const InputSchema = z.object({
     context: z.string().optional(),
     depth: z.number().int().min(1).max(6).default(3),
 });
-const inputShape = InputSchema.shape;
+const inputSchema = InputSchema;
 const OutputSchema = z
     .object({
     layers: z.array(z.object({ level: z.number().int(), questions: z.array(z.string()).default([]) })).default([]),
@@ -53,9 +53,13 @@ Return strict JSON only:
         });
         return { content: [{ type: "text", text }] };
     };
-    server.registerTool("socratic.inquire", {
+    const config = {
         title: "Socratic inquiry",
         description: "Generate a structured series of probing questions to clarify scope, assumptions, and evidence.",
-        inputSchema: inputShape,
-    }, handler);
+        inputSchema,
+    };
+    const wrap = (h) => (args, _extra) => h(args);
+    server.registerTool("socratic.inquire", config, wrap(handler));
+    server.registerTool("socratic_inquire", config, wrap(handler));
+    server.registerTool("socratic-inquire", config, wrap(handler));
 }

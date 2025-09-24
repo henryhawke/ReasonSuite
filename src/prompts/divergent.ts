@@ -8,27 +8,30 @@ const ArgsSchema = z.object({
     criteria: z.string().optional(),
 });
 
-const argsShape = definePromptArgsShape(ArgsSchema.shape);
+const argsShape = definePromptArgsShape(ArgsSchema.shape as any);
 
 export function registerDivergentPrompts(server: McpServer): void {
-    const callback: PromptCallback<typeof argsShape> = ({ prompt, k, criteria }, _extra) => ({
-        messages: [
-            {
-                role: "user" as const,
-                content: {
-                    type: "text" as const,
-                    text: `Divergent (ideas) then Convergent (scoring).\nTask: ${prompt}\nK: ${k ?? "5"}\nCriteria: ${criteria ?? "novelty,consistency,relevance"}\nReturn JSON with divergent, scores, winner, synthesis.`,
+    const callback = ((extra: any) => {
+        const { prompt, k, criteria } = extra?.params ?? {};
+        return {
+            messages: [
+                {
+                    role: "user" as const,
+                    content: {
+                        type: "text" as const,
+                        text: `Divergent (ideas) then Convergent (scoring).\nTask: ${prompt}\nK: ${k ?? "5"}\nCriteria: ${criteria ?? "novelty,consistency,relevance"}\nReturn JSON with divergent, scores, winner, synthesis.`,
+                    },
                 },
-            },
-        ],
-    });
+            ],
+        };
+    }) as unknown as PromptCallback<any>;
 
     server.registerPrompt(
         "reasoning.divergent_convergent",
         {
             title: "Divergent–Convergent",
             description: "Brainstorm then evaluate & synthesize",
-            argsSchema: argsShape,
+            argsSchema: argsShape as any,
         },
         callback
     );

@@ -7,16 +7,19 @@ const ArgsSchema = z.object({
 });
 const argsShape = definePromptArgsShape(ArgsSchema.shape);
 export function registerScientificPrompts(server) {
-    const callback = ({ goal, context, allow_tools }, _extra) => ({
-        messages: [
-            {
-                role: "user",
-                content: {
-                    type: "text",
-                    text: `You are an agent following a Scientific Analytic Framework.\nGoal: ${goal}\nContext: ${context ?? ""}\nAllow tools: ${allow_tools ?? "true"}\nReturn JSON with decomposition, hypotheses, tests, verification, answer.`,
+    const callback = ((extra) => {
+        const { goal, context, allow_tools } = extra?.params ?? {};
+        return {
+            messages: [
+                {
+                    role: "user",
+                    content: {
+                        type: "text",
+                        text: `You are an agent following a Scientific Analytic Framework.\nGoal: ${goal}\nContext: ${context ?? ""}\nAllow tools: ${allow_tools ?? "true"}\nReturn JSON with decomposition, hypotheses, tests, verification, answer.`,
+                    },
                 },
-            },
-        ],
+            ],
+        };
     });
     server.registerPrompt("reasoning.scientific", {
         title: "Scientific Analytic",

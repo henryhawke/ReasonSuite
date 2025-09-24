@@ -1,6 +1,5 @@
 import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { ZodRawShape } from "zod";
 import { Script, createContext } from "node:vm";
 
 type ExecResult = {
@@ -17,7 +16,7 @@ const InputSchema = z.object({
     timeout_ms: z.number().int().min(10).max(10_000).default(1500),
 });
 
-const inputShape = InputSchema.shape as ZodRawShape;
+const inputSchema = InputSchema as any;
 
 type InputArgs = z.output<typeof InputSchema>;
 type InputShape = typeof inputShape;
@@ -59,7 +58,7 @@ function runInSandbox(code: string, timeoutMs: number): ExecResult {
 }
 
 export function registerExec(server: McpServer): void {
-    const handler: ToolCallback<InputShape> = async ({ code, timeout_ms }) => {
+    const handler = async ({ code, timeout_ms }: any) => {
         const result = runInSandbox(code, timeout_ms);
         const payload: ExecResult = {
             stdout: result.stdout,
@@ -76,7 +75,7 @@ export function registerExec(server: McpServer): void {
             title: "Run sandboxed JavaScript code",
             description:
                 "Execute JavaScript code in a secure VM sandbox with a time limit. Captures print()/console.log output.",
-            inputSchema: inputShape,
+            inputSchema,
         },
         handler
     );

@@ -6,7 +6,7 @@ const InputSchema = z.object({
     k: z.number().int().min(2).max(10).default(4),
     apply_razors: z.array(z.string()).default([...DEFAULT_RAZORS]),
 });
-const inputShape = InputSchema.shape;
+const inputSchema = InputSchema;
 const OutputSchema = z
     .object({
     hypotheses: z
@@ -76,8 +76,9 @@ Return strict JSON only:
     const config = {
         title: "Abductive hypotheses",
         description: "Generate k candidate hypotheses and rank by plausibility, explanatory power, simplicity (MDL proxy), and testability.",
-        inputSchema: inputShape,
+        inputSchema,
     };
-    server.registerTool("abductive.hypothesize", config, handler);
-    server.registerTool("abductive_hypothesize", config, handler);
+    server.registerTool("abductive.hypothesize", config, (args, _extra) => handler(args));
+    server.registerTool("abductive_hypothesize", config, (args, _extra) => handler(args));
+    server.registerTool("abductive-hypothesize", config, (args, _extra) => handler(args));
 }

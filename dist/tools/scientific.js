@@ -5,7 +5,7 @@ const InputSchema = z.object({
     context: z.string().optional(),
     allow_tools: z.boolean().default(true),
 });
-const inputShape = InputSchema.shape;
+const inputSchema = InputSchema;
 const OutputSchema = z
     .object({
     decomposition: z.array(z.string()).default([]),
@@ -56,8 +56,10 @@ Prefer simpler explanations (Occam/MDL). If tools are allowed: propose concrete 
     const config = {
         title: "Scientific Analytic Framework",
         description: "Decompose, hypothesize, test with tools, and verify (Popperian falsification).",
-        inputSchema: inputShape,
+        inputSchema,
     };
-    server.registerTool("reasoning.scientific", config, handler);
-    server.registerTool("reasoning_scientific", config, handler);
+    const wrap = (h) => (args, _extra) => h(args);
+    server.registerTool("reasoning.scientific", config, wrap(handler));
+    server.registerTool("reasoning_scientific", config, wrap(handler));
+    server.registerTool("reasoning-scientific", config, wrap(handler));
 }

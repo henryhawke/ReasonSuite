@@ -8,27 +8,30 @@ const ArgsSchema = z.object({
     focus: z.string().optional(),
 });
 
-const argsShape = definePromptArgsShape(ArgsSchema.shape);
+const argsShape = definePromptArgsShape(ArgsSchema.shape as any);
 
 export function registerRedBluePrompts(server: McpServer): void {
-    const callback: PromptCallback<typeof argsShape> = ({ proposal, rounds, focus }, _extra) => ({
-        messages: [
-            {
-                role: "user" as const,
-                content: {
-                    type: "text" as const,
-                    text: `Conduct ${rounds ?? "2"} rounds of Red (attack) vs Blue (defense) on:\n${proposal}\n\nFocus areas: ${focus ?? "safety,bias,hallucination,security,privacy"}. Return JSON transcript, defects, risk_matrix, final_guidance.`,
+    const callback = ((extra: any) => {
+        const { proposal, rounds, focus } = extra?.params ?? {};
+        return {
+            messages: [
+                {
+                    role: "user" as const,
+                    content: {
+                        type: "text" as const,
+                        text: `Conduct ${rounds ?? "2"} rounds of Red (attack) vs Blue (defense) on:\n${proposal}\n\nFocus areas: ${focus ?? "safety,bias,hallucination,security,privacy"}. Return JSON transcript, defects, risk_matrix, final_guidance.`,
+                    },
                 },
-            },
-        ],
-    });
+            ],
+        };
+    }) as unknown as PromptCallback<any>;
 
     server.registerPrompt(
         "redblue.challenge",
         {
             title: "Red/Blue Challenge",
             description: "Adversarial critique with risk matrix",
-            argsSchema: argsShape,
+            argsSchema: argsShape as any,
         },
         callback
     );

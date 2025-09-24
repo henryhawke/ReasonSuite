@@ -7,28 +7,31 @@ const ArgsSchema = z.object({
     depth: z.string().optional(),
 });
 
-const argsShape = definePromptArgsShape(ArgsSchema.shape);
+const argsShape = definePromptArgsShape(ArgsSchema.shape as any);
 
 export function registerSocraticPrompts(server: McpServer): void {
-    const callback: PromptCallback<typeof argsShape> = ({ topic, depth }, _extra) => ({
-        messages: [
-            {
-                role: "user" as const,
-                content: {
-                    type: "text" as const,
-                    text: `Produce a ${depth ?? "3"}-layer Socratic question tree for: ${topic}
+    const callback = ((extra: any) => {
+        const { topic, depth } = extra?.params ?? {};
+        return {
+            messages: [
+                {
+                    role: "user" as const,
+                    content: {
+                        type: "text" as const,
+                        text: `Produce a ${depth ?? "3"}-layer Socratic question tree for: ${topic}
 Include assumptions_to_test, evidence_to_collect, next_actions. Output JSON.`,
+                    },
                 },
-            },
-        ],
-    });
+            ],
+        };
+    }) as unknown as PromptCallback<any>;
 
     server.registerPrompt(
         "socratic.tree",
         {
             title: "Socratic Tree",
             description: "Generate multi-layer probing questions + assumptions/evidence",
-            argsSchema: argsShape,
+            argsSchema: argsShape as any,
         },
         callback
     );

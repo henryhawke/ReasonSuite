@@ -1,6 +1,5 @@
-import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { ZodRawShape } from "zod";
 import { DEFAULT_RAZORS } from "../lib/razors.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 import { buildFallback as selectorFallback } from "../tools/selector.js";
@@ -41,13 +40,13 @@ const InputSchema = z.object({
     maxSteps: z.number().int().positive().max(8).default(4),
 });
 
-const inputShape = InputSchema.shape as ZodRawShape;
+const inputShape = InputSchema.shape as any;
 
 type InputArgs = z.output<typeof InputSchema>;
 type InputShape = typeof inputShape;
 
 export function registerRouter(server: McpServer): void {
-    const handler: ToolCallback<InputShape> = async ({ task, context, maxSteps }) => {
+    const handler = async ({ task, context, maxSteps }: any) => {
         const prompt = `You are a planning assistant that selects reasoning tools for an autonomous analyst.
 Available modes and their corresponding tool IDs:
 - socratic -> socratic.inquire (scope + assumptions)
@@ -91,7 +90,7 @@ Limit steps to ${maxSteps}. Always start by clarifying scope (socratic) unless t
             title: "Plan reasoning approach",
             description:
                 "Given a task, propose an ordered plan of reasoning modes with brief rationale. Modes include dialectic, socratic, abductive, systems, redblue, analogical, constraint, razors.apply, scientific, self_explain, divergent, exec.",
-            inputSchema: inputShape,
+            inputSchema: inputShape as any,
         },
         handler
     );

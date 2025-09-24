@@ -4,7 +4,7 @@ const InputSchema = z.object({
     query: z.string(),
     allow_citations: z.boolean().default(true),
 });
-const inputShape = InputSchema.shape;
+const inputSchema = InputSchema;
 const OutputSchema = z
     .object({
     rationale: z.array(z.string()).default([]),
@@ -42,9 +42,10 @@ If citations allowed, include sources; otherwise, note what would be retrieved.`
         });
         return { content: [{ type: "text", text }] };
     };
+    const wrap = (h) => (args, _extra) => h(args);
     server.registerTool("reasoning.self_explain", {
         title: "Transparent Self-Explanation",
         description: "Produce a rationale (chain-of-thought style summary), cite evidence, self-critique, and revise.",
-        inputSchema: inputShape,
-    }, handler);
+        inputSchema,
+    }, wrap(handler));
 }

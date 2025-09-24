@@ -5,7 +5,7 @@ const InputSchema = z.object({
     rounds: z.number().int().min(1).max(5).default(2),
     focus: z.array(z.string()).default(["safety", "bias", "hallucination", "security", "privacy"]),
 });
-const inputShape = InputSchema.shape;
+const inputSchema = InputSchema;
 const OutputSchema = z
     .object({
     rounds: z
@@ -74,8 +74,10 @@ Return strict JSON only:
     const config = {
         title: "Red vs Blue critique",
         description: "Run N rounds of adversarial challenge/defense on a proposal or answer. Returns a transcript + defects + risk matrix.",
-        inputSchema: inputShape,
+        inputSchema,
     };
-    server.registerTool("redblue.challenge", config, handler);
-    server.registerTool("redblue_challenge", config, handler);
+    const wrap = (h) => (args, _extra) => h(args);
+    server.registerTool("redblue.challenge", config, wrap(handler));
+    server.registerTool("redblue_challenge", config, wrap(handler));
+    server.registerTool("redblue-challenge", config, wrap(handler));
 }

@@ -5,7 +5,7 @@ const InputSchema = z.object({
     target_problem: z.string(),
     constraints: z.string().optional(),
 });
-const inputShape = InputSchema.shape;
+const inputSchema = InputSchema;
 const OutputSchema = z
     .object({
     mapping: z
@@ -61,8 +61,9 @@ JSON only:
     const config = {
         title: "Analogical mapping",
         description: "Map structure from a source domain to a target problem; identify correspondences, constraints, and transfer risks.",
-        inputSchema: inputShape,
+        inputSchema,
     };
     server.registerTool("analogical.map", config, handler);
     server.registerTool("analogical_map", config, handler);
+    server.registerTool("analogical-map", config, handler);
 }

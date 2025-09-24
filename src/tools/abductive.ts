@@ -1,6 +1,5 @@
-import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { ZodRawShape } from "zod";
 import { DEFAULT_RAZORS, summarizeRazors } from "../lib/razors.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
@@ -10,10 +9,10 @@ const InputSchema = z.object({
     apply_razors: z.array(z.string()).default([...DEFAULT_RAZORS]),
 });
 
-const inputShape = InputSchema.shape as ZodRawShape;
+const inputSchema = InputSchema as any;
 
 type InputArgs = z.output<typeof InputSchema>;
-type InputShape = typeof inputShape;
+type InputShape = typeof inputSchema;
 
 const OutputSchema = z
     .object({
@@ -39,7 +38,7 @@ const OutputSchema = z
     .extend({ meta: ReasoningMetadataSchema.optional() });
 
 export function registerAbductive(server: McpServer): void {
-    const handler: ToolCallback<InputShape> = async ({ observations, k, apply_razors }) => {
+    const handler = async ({ observations, k, apply_razors }: any) => {
         const prompt = `Observations:\n${observations}
 
 Generate ${k} abductive hypotheses. Score each on:
@@ -89,9 +88,10 @@ Return strict JSON only:
         title: "Abductive hypotheses",
         description:
             "Generate k candidate hypotheses and rank by plausibility, explanatory power, simplicity (MDL proxy), and testability.",
-        inputSchema: inputShape,
+        inputSchema,
     };
 
-    server.registerTool("abductive.hypothesize", config, handler);
-    server.registerTool("abductive_hypothesize", config, handler);
+    server.registerTool("abductive.hypothesize", config, (args: any, _extra: any) => handler(args));
+    server.registerTool("abductive_hypothesize", config, (args: any, _extra: any) => handler(args));
+    server.registerTool("abductive-hypothesize", config, (args: any, _extra: any) => handler(args));
 }

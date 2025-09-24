@@ -1,6 +1,5 @@
-import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { ZodRawShape } from "zod";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
 const InputSchema = z.object({
@@ -9,10 +8,10 @@ const InputSchema = z.object({
     audience: z.string().default("general"),
 });
 
-const inputShape = InputSchema.shape as ZodRawShape;
+const inputSchema = InputSchema as any;
 
 type InputArgs = z.output<typeof InputSchema>;
-type InputShape = typeof inputShape;
+type InputShape = typeof inputSchema;
 
 const OutputSchema = z
     .object({
@@ -29,7 +28,7 @@ const OutputSchema = z
     .extend({ meta: ReasoningMetadataSchema.optional() });
 
 export function registerDialectic(server: McpServer): void {
-    const handler: ToolCallback<InputShape> = async ({ claim, context, audience }) => {
+    const handler = async ({ claim, context, audience }: any) => {
         const prompt = `Use a dialectical frame.
 Claim: ${claim}
 Context: ${context ?? ""}
@@ -71,9 +70,10 @@ Return strict JSON only:
     const config = {
         title: "Dialectic (Thesis–Antithesis–Synthesis)",
         description: "Given a claim, produce thesis, antithesis, and synthesis with evidence requests.",
-        inputSchema: inputShape,
+        inputSchema,
     };
 
-    server.registerTool("dialectic.tas", config, handler);
-    server.registerTool("dialectic_tas", config, handler);
+    const wrap = (h: any) => (args: any, _extra: any) => h(args);
+    server.registerTool("dialectic.tas", config, wrap(handler));
+    server.registerTool("dialectic_tas", config, wrap(handler));
 }

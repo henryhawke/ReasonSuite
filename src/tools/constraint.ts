@@ -1,6 +1,5 @@
-import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { ZodRawShape } from "zod";
 import { parseModel } from "../lib/dsl.js";
 import { init } from "z3-solver";
 
@@ -12,10 +11,10 @@ const InputSchema = z.object({
     model_json: z.string().describe("JSON with {variables, constraints, optimize?}"),
 });
 
-const inputShape = InputSchema.shape as ZodRawShape;
+const inputSchema = InputSchema as any;
 
 type InputArgs = z.output<typeof InputSchema>;
-type InputShape = typeof inputShape;
+type InputShape = typeof inputSchema;
 
 function serializeModel(entries: SolverEntry[]): SerializedModel {
     const model: SerializedModel = {};
@@ -28,7 +27,7 @@ function serializeModel(entries: SolverEntry[]): SerializedModel {
 }
 
 export function registerConstraint(server: McpServer): void {
-    const handler: ToolCallback<InputShape> = async ({ model_json }) => {
+    const handler = async ({ model_json }: any) => {
         let req;
         try {
             req = parseModel(model_json);
@@ -124,7 +123,16 @@ export function registerConstraint(server: McpServer): void {
         {
             title: "Constraint solver (Z3)",
             description: "Solve constraints using Z3. Input mini-DSL as JSON (variables, constraints, optional optimize).",
-            inputSchema: inputShape,
+            inputSchema,
+        },
+        handler
+    );
+    server.registerTool(
+        "constraint_solve",
+        {
+            title: "Constraint solver (Z3)",
+            description: "Solve constraints using Z3. Input mini-DSL as JSON (variables, constraints, optional optimize).",
+            inputSchema,
         },
         handler
     );

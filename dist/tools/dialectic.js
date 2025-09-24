@@ -5,7 +5,7 @@ const InputSchema = z.object({
     context: z.string().optional(),
     audience: z.string().default("general"),
 });
-const inputShape = InputSchema.shape;
+const inputSchema = InputSchema;
 const OutputSchema = z
     .object({
     thesis: z.object({ position: z.string(), key_points: z.array(z.string()).default([]) }),
@@ -61,8 +61,9 @@ Return strict JSON only:
     const config = {
         title: "Dialectic (Thesis–Antithesis–Synthesis)",
         description: "Given a claim, produce thesis, antithesis, and synthesis with evidence requests.",
-        inputSchema: inputShape,
+        inputSchema,
     };
-    server.registerTool("dialectic.tas", config, handler);
-    server.registerTool("dialectic_tas", config, handler);
+    const wrap = (h) => (args, _extra) => h(args);
+    server.registerTool("dialectic.tas", config, wrap(handler));
+    server.registerTool("dialectic_tas", config, wrap(handler));
 }

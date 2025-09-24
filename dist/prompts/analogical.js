@@ -7,16 +7,19 @@ const ArgsSchema = z.object({
 });
 const argsShape = definePromptArgsShape(ArgsSchema.shape);
 export function registerAnalogicalPrompts(server) {
-    const callback = ({ source_domain, target_problem, constraints }, _extra) => ({
-        messages: [
-            {
-                role: "user",
-                content: {
-                    type: "text",
-                    text: `Build a structural analogy from SOURCE to TARGET.\n\nSOURCE: ${source_domain}\nTARGET: ${target_problem}\nCONSTRAINTS: ${constraints ?? ""}\n\nReturn JSON mapping, shared_relations, mismatches, transferable_insights, failure_modes.`,
+    const callback = ((extra) => {
+        const { source_domain, target_problem, constraints } = extra?.params ?? {};
+        return {
+            messages: [
+                {
+                    role: "user",
+                    content: {
+                        type: "text",
+                        text: `Build a structural analogy from SOURCE to TARGET.\n\nSOURCE: ${source_domain}\nTARGET: ${target_problem}\nCONSTRAINTS: ${constraints ?? ""}\n\nReturn JSON mapping, shared_relations, mismatches, transferable_insights, failure_modes.`,
+                    },
                 },
-            },
-        ],
+            ],
+        };
     });
     server.registerPrompt("analogical.map", {
         title: "Analogical Mapping",

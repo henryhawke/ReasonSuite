@@ -1,6 +1,5 @@
 import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { ZodRawShape } from "zod";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
 const InputSchema = z.object({
@@ -9,10 +8,10 @@ const InputSchema = z.object({
     focus: z.array(z.string()).default(["safety", "bias", "hallucination", "security", "privacy"]),
 });
 
-const inputShape = InputSchema.shape as ZodRawShape;
+const inputSchema = InputSchema as any;
 
 type InputArgs = z.output<typeof InputSchema>;
-type InputShape = typeof inputShape;
+type InputShape = typeof inputSchema;
 
 const OutputSchema = z
     .object({
@@ -47,7 +46,7 @@ const OutputSchema = z
     .extend({ meta: ReasoningMetadataSchema.optional() });
 
 export function registerRedBlue(server: McpServer): void {
-    const handler: ToolCallback<InputShape> = async ({ proposal, rounds, focus }) => {
+    const handler = async ({ proposal, rounds, focus }: any) => {
         const prompt = `Conduct ${rounds} rounds of Red (attack) vs Blue (defense) on:
 ${proposal}
 
@@ -89,9 +88,11 @@ Return strict JSON only:
         title: "Red vs Blue critique",
         description:
             "Run N rounds of adversarial challenge/defense on a proposal or answer. Returns a transcript + defects + risk matrix.",
-        inputSchema: inputShape,
+        inputSchema,
     };
 
-    server.registerTool("redblue.challenge", config, handler);
-    server.registerTool("redblue_challenge", config, handler);
+    const wrap = (h: any) => (args: any, _extra: any) => h(args);
+    server.registerTool("redblue.challenge", config, wrap(handler));
+    server.registerTool("redblue_challenge", config, wrap(handler));
+    server.registerTool("redblue-challenge", config, wrap(handler));
 }

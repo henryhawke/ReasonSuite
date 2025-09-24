@@ -1,6 +1,5 @@
 import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { ZodRawShape } from "zod";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
 const InputSchema = z.object({
@@ -9,10 +8,10 @@ const InputSchema = z.object({
     allow_tools: z.boolean().default(true),
 });
 
-const inputShape = InputSchema.shape as ZodRawShape;
+const inputSchema = InputSchema as any;
 
 type InputArgs = z.output<typeof InputSchema>;
-type InputShape = typeof inputShape;
+type InputShape = typeof inputSchema;
 
 const OutputSchema = z
     .object({
@@ -28,7 +27,7 @@ const OutputSchema = z
     .extend({ meta: ReasoningMetadataSchema.optional() });
 
 export function registerScientific(server: McpServer): void {
-    const handler: ToolCallback<InputShape> = async ({ goal, context, allow_tools }) => {
+    const handler = async ({ goal, context, allow_tools }: any) => {
         const prompt = `You are an agent following a Scientific Analytic Framework.
 Goal: ${goal}
 Context: ${context ?? ""}
@@ -66,9 +65,11 @@ Prefer simpler explanations (Occam/MDL). If tools are allowed: propose concrete 
     const config = {
         title: "Scientific Analytic Framework",
         description: "Decompose, hypothesize, test with tools, and verify (Popperian falsification).",
-        inputSchema: inputShape,
+        inputSchema,
     };
 
-    server.registerTool("reasoning.scientific", config, handler);
-    server.registerTool("reasoning_scientific", config, handler);
+    const wrap = (h: any) => (args: any, _extra: any) => h(args);
+    server.registerTool("reasoning.scientific", config, wrap(handler));
+    server.registerTool("reasoning_scientific", config, wrap(handler));
+    server.registerTool("reasoning-scientific", config, wrap(handler));
 }

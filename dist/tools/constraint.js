@@ -4,7 +4,7 @@ import { init } from "z3-solver";
 const InputSchema = z.object({
     model_json: z.string().describe("JSON with {variables, constraints, optimize?}"),
 });
-const inputShape = InputSchema.shape;
+const inputSchema = InputSchema;
 function serializeModel(entries) {
     const model = {};
     for (const [name, value] of entries) {
@@ -101,6 +101,11 @@ export function registerConstraint(server) {
     server.registerTool("constraint.solve", {
         title: "Constraint solver (Z3)",
         description: "Solve constraints using Z3. Input mini-DSL as JSON (variables, constraints, optional optimize).",
-        inputSchema: inputShape,
+        inputSchema,
+    }, handler);
+    server.registerTool("constraint_solve", {
+        title: "Constraint solver (Z3)",
+        description: "Solve constraints using Z3. Input mini-DSL as JSON (variables, constraints, optional optimize).",
+        inputSchema,
     }, handler);
 }

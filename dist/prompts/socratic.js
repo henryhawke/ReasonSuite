@@ -6,17 +6,20 @@ const ArgsSchema = z.object({
 });
 const argsShape = definePromptArgsShape(ArgsSchema.shape);
 export function registerSocraticPrompts(server) {
-    const callback = ({ topic, depth }, _extra) => ({
-        messages: [
-            {
-                role: "user",
-                content: {
-                    type: "text",
-                    text: `Produce a ${depth ?? "3"}-layer Socratic question tree for: ${topic}
+    const callback = ((extra) => {
+        const { topic, depth } = extra?.params ?? {};
+        return {
+            messages: [
+                {
+                    role: "user",
+                    content: {
+                        type: "text",
+                        text: `Produce a ${depth ?? "3"}-layer Socratic question tree for: ${topic}
 Include assumptions_to_test, evidence_to_collect, next_actions. Output JSON.`,
+                    },
                 },
-            },
-        ],
+            ],
+        };
     });
     server.registerPrompt("socratic.tree", {
         title: "Socratic Tree",

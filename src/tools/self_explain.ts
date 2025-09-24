@@ -1,6 +1,5 @@
 import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { ZodRawShape } from "zod";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
 const InputSchema = z.object({
@@ -8,10 +7,10 @@ const InputSchema = z.object({
     allow_citations: z.boolean().default(true),
 });
 
-const inputShape = InputSchema.shape as ZodRawShape;
+const inputSchema = InputSchema as any;
 
 type InputArgs = z.output<typeof InputSchema>;
-type InputShape = typeof inputShape;
+type InputShape = typeof inputSchema;
 
 const OutputSchema = z
     .object({
@@ -23,7 +22,7 @@ const OutputSchema = z
     .extend({ meta: ReasoningMetadataSchema.optional() });
 
 export function registerSelfExplain(server: McpServer): void {
-    const handler: ToolCallback<InputShape> = async ({ query, allow_citations }) => {
+    const handler = async ({ query, allow_citations }: any) => {
         const prompt = `Transparent Self-Explanation.
 Query: ${query}
 
@@ -52,13 +51,14 @@ If citations allowed, include sources; otherwise, note what would be retrieved.`
         return { content: [{ type: "text", text }] };
     };
 
+    const wrap = (h: any) => (args: any, _extra: any) => h(args);
     server.registerTool(
         "reasoning.self_explain",
         {
             title: "Transparent Self-Explanation",
             description: "Produce a rationale (chain-of-thought style summary), cite evidence, self-critique, and revise.",
-            inputSchema: inputShape,
+            inputSchema,
         },
-        handler
+        wrap(handler)
     );
 }

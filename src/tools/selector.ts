@@ -1,6 +1,5 @@
-import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { ZodRawShape } from "zod";
 import { DEFAULT_RAZORS, RAZOR_DESCRIPTIONS } from "../lib/razors.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 import type { ReasoningMode } from "../lib/types.js";
@@ -166,10 +165,11 @@ const InputSchema = z.object({
     candidate_razors: z.array(z.string()).default([...DEFAULT_RAZORS]),
 });
 
-const inputShape = InputSchema.shape as ZodRawShape;
+// Use the full Zod schema for MCP tool input validation
+const inputSchema = InputSchema as any;
 
 type InputArgs = z.output<typeof InputSchema>;
-type InputShape = typeof inputShape;
+type InputShape = typeof inputSchema;
 
 type ModeScore = {
     id: ModeId;
@@ -531,7 +531,7 @@ export function rankRazorsFallback(opts: {
 }
 
 export function registerSelector(server: McpServer): void {
-    const handler: ToolCallback<InputShape> = async ({ request, context, candidate_modes, candidate_razors }) => {
+    const handler = async ({ request, context, candidate_modes, candidate_razors }: any) => {
         const modes = (candidate_modes?.length ? candidate_modes : [...MODE_IDS]).filter(isModeId);
         const normalizedModes = modes.length ? modes : [...MODE_IDS];
         const razorList = candidate_razors?.length ? candidate_razors : [...DEFAULT_RAZORS];
@@ -549,14 +549,16 @@ export function registerSelector(server: McpServer): void {
         return { content: [{ type: "text", text }] };
     };
 
-    server.registerTool(
-        "reasoning.selector",
-        {
-            title: "Select reasoning mode & razors",
-            description:
-                "Given a request, recommend the most useful reasoning mode and which Occam/Popper-style razors to apply next.",
-            inputSchema: inputShape,
-        },
-        handler
-    );
+    const config = {
+        title: "Select reasoning mode & razors",
+        description:
+            "Given a request, recommend the most useful reasoning mode and which Occam/Popper-style razors to apply next.",
+        inputSchema,
+    } as const;
+
+    const wrap = (h: any) => (args: any, _extra: any) => h(args);
+    server.registerTool("reasoning.selector", config as any, wrap(handler));
+    // Provide underscore and dashed aliases for clients that use snake_case/kebab_case naming
+    server.registerTool("reasoning_selector", config as any, wrap(handler));
+    server.registerTool("reasoning-selector", config as any, wrap(handler));
 }
