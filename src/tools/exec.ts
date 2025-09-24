@@ -1,6 +1,7 @@
-import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { Script, createContext } from "node:vm";
+import { jsonResult, type ToolCallback } from "../lib/mcp.js";
 
 type ExecResult = {
     stdout: string[];
@@ -58,7 +59,8 @@ function runInSandbox(code: string, timeoutMs: number): ExecResult {
 }
 
 export function registerExec(server: McpServer): void {
-    const handler = async ({ code, timeout_ms }: any) => {
+    const handler: ToolCallback<any> = async (rawArgs, _extra) => {
+        const { code, timeout_ms } = rawArgs as InputArgs;
         const result = runInSandbox(code, timeout_ms);
         const payload: ExecResult = {
             stdout: result.stdout,
@@ -66,7 +68,7 @@ export function registerExec(server: McpServer): void {
             result: result.result,
             timedOut: result.timedOut,
         };
-        return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }] };
+        return jsonResult(payload);
     };
 
     server.registerTool(

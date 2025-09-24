@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { Script, createContext } from "node:vm";
+import { jsonResult } from "../lib/mcp.js";
 const InputSchema = z.object({
     code: z
         .string()
@@ -41,7 +42,8 @@ function runInSandbox(code, timeoutMs) {
     return { stdout, stderr, result, timedOut };
 }
 export function registerExec(server) {
-    const handler = async ({ code, timeout_ms }) => {
+    const handler = async (rawArgs, _extra) => {
+        const { code, timeout_ms } = rawArgs;
         const result = runInSandbox(code, timeout_ms);
         const payload = {
             stdout: result.stdout,
@@ -49,7 +51,7 @@ export function registerExec(server) {
             result: result.result,
             timedOut: result.timedOut,
         };
-        return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }] };
+        return jsonResult(payload);
     };
     server.registerTool("exec.run", {
         title: "Run sandboxed JavaScript code",

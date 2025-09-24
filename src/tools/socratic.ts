@@ -1,5 +1,7 @@
-import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { textResult, type ToolCallback } from "../lib/mcp.js";
+import { STRICT_JSON_REMINDER } from "../lib/prompt.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
 const InputSchema = z.object({
@@ -23,10 +25,20 @@ const OutputSchema = z
     .extend({ meta: ReasoningMetadataSchema.optional() });
 
 export function registerSocratic(server: McpServer): void {
-    const handler = async ({ topic, context, depth }: any) => {
+    const handler: ToolCallback<any> = async (rawArgs, _extra) => {
+        const { topic, context, depth } = rawArgs as InputArgs;
         const prompt = `Produce a ${depth}-layer Socratic question tree for: "${topic}"
 Context: ${context ?? ""}
-Return strict JSON only:
+
+Deliberation steps:
+1. For each layer from 1 to ${depth}, list probing questions that deepen understanding of the topic (layer 1 clarifies scope and definitions; deeper layers challenge assumptions and evidence).
+2. Summarise assumptions_to_test exposed by the questioning.
+3. Recommend evidence_to_collect.
+4. Suggest next_actions to close knowledge gaps.
+
+${STRICT_JSON_REMINDER}
+
+JSON schema to emit:
 {
  "layers": [
    {"level": 1, "questions": ["..."]},
@@ -35,7 +47,8 @@ Return strict JSON only:
  "assumptions_to_test": ["..."],
  "evidence_to_collect": ["..."],
  "next_actions": ["..."]
-}`;
+}
+Return only that JSON object.`;
         const { text } = await sampleStructuredJson({
             server,
             prompt,
@@ -60,7 +73,7 @@ Return strict JSON only:
                 };
             },
         });
-        return { content: [{ type: "text", text }] };
+        return textResult(text);
     };
 
     const config = {
@@ -69,7 +82,7 @@ Return strict JSON only:
         inputSchema,
     } as const;
 
-    server.registerTool("socratic.inquire", config as any, handler);
-    server.registerTool("socratic_inquire", config as any, handler);
-    server.registerTool("socratic-inquire", config as any, handler);
+    server.registerTool("socratic.inquire", config, handler);
+    server.registerTool("socratic_inquire", config, handler);
+    server.registerTool("socratic-inquire", config, handler);
 }

@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { textResult } from "../lib/mcp.js";
+import { STRICT_JSON_REMINDER } from "../lib/prompt.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 const InputSchema = z.object({
     goal: z.string().describe("Problem to solve"),
@@ -19,12 +21,24 @@ const OutputSchema = z
 })
     .extend({ meta: ReasoningMetadataSchema.optional() });
 export function registerScientific(server) {
-    const handler = async ({ goal, context, allow_tools }) => {
+    const handler = async (rawArgs, _extra) => {
+        const { goal, context, allow_tools } = rawArgs;
         const prompt = `You are an agent following a Scientific Analytic Framework.
 Goal: ${goal}
 Context: ${context ?? ""}
 
-Produce strict JSON only:
+Deliberation steps:
+1. Decomposition – break the goal into manageable sub-problems or questions.
+2. Hypotheses – list candidate explanations or solution directions to test.
+3. Tests – propose concrete experiments, code executions, constraint checks, or observations (prefer tool calls if allow_tools is true).
+4. Verification – describe how falsification or validation will occur (Popper style).
+5. Answer – deliver the best current conclusion with caveats.
+
+Prefer simpler explanations (Occam/MDL). If tools are allowed: propose concrete checks (unit tests, Z3 constraints, code run).
+
+${STRICT_JSON_REMINDER}
+
+JSON schema to emit:
 {
   "decomposition": ["..."],
   "hypotheses": ["..."],
@@ -32,7 +46,7 @@ Produce strict JSON only:
  "verification": {"strategy":"...","popper_falsification":"..."},
  "answer": "final"
 }
-Prefer simpler explanations (Occam/MDL). If tools are allowed: propose concrete checks (unit tests, Z3 constraints, code run).`;
+Return only that JSON object.`;
         const { text } = await sampleStructuredJson({
             server,
             prompt,
@@ -51,7 +65,7 @@ Prefer simpler explanations (Occam/MDL). If tools are allowed: propose concrete 
                 answer: "Deterministic scaffold—rerun with sampling for richer details.",
             }),
         });
-        return { content: [{ type: "text", text }] };
+        return textResult(text);
     };
     const config = {
         title: "Scientific Analytic Framework",

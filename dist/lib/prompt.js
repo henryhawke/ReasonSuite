@@ -1,9 +1,6 @@
-export type PromptArgsShape = Record<string, unknown>;
-
-export function definePromptArgsShape<T extends PromptArgsShape>(shape: T): T {
+export function definePromptArgsShape(shape) {
     return shape;
 }
-
 export const STRICT_JSON_REMINDER = [
     "Deliberation discipline:",
     "- Think through the requested steps internally before you reply.",

@@ -1,6 +1,6 @@
 import type { McpServer, PromptCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { definePromptArgsShape } from "../lib/prompt.js";
+import { definePromptArgsShape, STRICT_JSON_REMINDER } from "../lib/prompt.js";
 
 const ArgsSchema = z.object({
     source_domain: z.string(),
@@ -19,7 +19,7 @@ export function registerAnalogicalPrompts(server: McpServer): void {
                     role: "user" as const,
                     content: {
                         type: "text" as const,
-                        text: `Build a structural analogy from SOURCE to TARGET.\n\nSOURCE: ${source_domain}\nTARGET: ${target_problem}\nCONSTRAINTS: ${constraints ?? ""}\n\nReturn JSON mapping, shared_relations, mismatches, transferable_insights, failure_modes.`,
+                        text: `Act as an analogy architect.\n\nSOURCE DOMAIN:\n${source_domain}\n\nTARGET PROBLEM:\n${target_problem}\n\nCONSTRAINTS OR MUST-HAVES:\n${constraints ?? "(none provided)"}\n\nDeliberation steps:\n1. Identify the core entities, relationships, and dynamics in the source domain.\n2. Map each relevant source element to the most plausible target counterpart and justify the mapping.\n3. List structural relations that transfer cleanly and flag mismatches or missing components that break the analogy.\n4. Summarize transferable_insights plus failure_modes or cautionary tales the target should watch.\n${STRICT_JSON_REMINDER}\n\nJSON schema to emit:\n{"mapping":[{"source":"...","target":"...","justification":"..."}],"shared_relations":["..."],"mismatches":["..."],"transferable_insights":["..."],"failure_modes":["..."]}\nReturn only that JSON object.`,
                     },
                 },
             ],

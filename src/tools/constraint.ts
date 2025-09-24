@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { jsonResult, type ToolCallback } from "../lib/mcp.js";
 import { parseModel } from "../lib/dsl.js";
 import { init } from "z3-solver";
 
@@ -16,6 +17,38 @@ const inputSchema = InputSchema as any;
 type InputArgs = z.output<typeof InputSchema>;
 type InputShape = typeof inputSchema;
 
+const SIMPLE_COMPARISON =
+    /^([A-Za-z_][A-Za-z0-9_]*)\s*(<=|>=|==|=|!=|>|<)\s*([-+]?[A-Za-z0-9_\.]+)$/;
+
+function toSmtConstraint(raw: string): string {
+    const trimmed = raw.trim();
+    if (!trimmed) {
+        return trimmed;
+    }
+    if (trimmed.startsWith("(")) {
+        return trimmed;
+    }
+    const match = SIMPLE_COMPARISON.exec(trimmed);
+    if (!match) {
+        return trimmed;
+    }
+    const [, variable, op, rhs] = match;
+    switch (op) {
+        case "!=":
+            return `(distinct ${variable} ${rhs})`;
+        case "==":
+        case "=":
+            return `(= ${variable} ${rhs})`;
+        case ">":
+        case "<":
+        case ">=":
+        case "<=":
+            return `(${op} ${variable} ${rhs})`;
+        default:
+            return trimmed;
+    }
+}
+
 function serializeModel(entries: SolverEntry[]): SerializedModel {
     const model: SerializedModel = {};
     for (const [name, value] of entries) {
@@ -27,19 +60,13 @@ function serializeModel(entries: SolverEntry[]): SerializedModel {
 }
 
 export function registerConstraint(server: McpServer): void {
-    const handler = async ({ model_json }: any) => {
+    const handler: ToolCallback<any> = async (rawArgs, _extra) => {
+        const { model_json } = rawArgs as InputArgs;
         let req;
         try {
             req = parseModel(model_json);
         } catch (e: unknown) {
-            return {
-                content: [
-                    {
-                        type: "text",
-                        text: JSON.stringify({ error: (e as Error)?.message ?? "Invalid model_json" }, null, 2),
-                    },
-                ],
-            };
+            return jsonResult({ error: (e as Error)?.message ?? "Invalid model_json" });
         }
 
         try {
@@ -61,7 +88,8 @@ export function registerConstraint(server: McpServer): void {
                 }
             }
 
-            const assertions = req.constraints.map((c) => `(assert ${c})`);
+            const normalizedConstraints = req.constraints.map(toSmtConstraint);
+            const assertions = normalizedConstraints.map((c) => `(assert ${c})`);
             const baseScript = [...declarations, ...assertions].join("\n");
 
             if (req.optimize && req.optimize.objective) {
@@ -77,19 +105,12 @@ export function registerConstraint(server: McpServer): void {
 
                 const status = await opt.check();
                 if (status !== "sat") {
-                    return { content: [{ type: "text", text: JSON.stringify({ status }, null, 2) }] };
+                    return jsonResult({ status });
                 }
 
                 const model = opt.model();
                 const entries = Object.entries(variableSymbols).map(([name, sym]) => [name, model.get(sym)] as SolverEntry);
-                return {
-                    content: [
-                        {
-                            type: "text",
-                            text: JSON.stringify({ status, model: serializeModel(entries) }, null, 2),
-                        },
-                    ],
-                };
+                return jsonResult({ status, model: serializeModel(entries) });
             }
 
             const solver = new Solver();
@@ -99,22 +120,15 @@ export function registerConstraint(server: McpServer): void {
 
             const status = await solver.check();
             if (status !== "sat") {
-                return { content: [{ type: "text", text: JSON.stringify({ status }, null, 2) }] };
+                return jsonResult({ status });
             }
 
             const model = solver.model();
             const entries = Object.entries(variableSymbols).map(([name, sym]) => [name, model.get(sym)] as SolverEntry);
-            return {
-                content: [
-                    {
-                        type: "text",
-                        text: JSON.stringify({ status, model: serializeModel(entries) }, null, 2),
-                    },
-                ],
-            };
+            return jsonResult({ status, model: serializeModel(entries) });
         } catch (err: unknown) {
             const message = (err as Error)?.message ?? "Solver error";
-            return { content: [{ type: "text", text: JSON.stringify({ error: message }, null, 2) }] };
+            return jsonResult({ error: message });
         }
     };
 
