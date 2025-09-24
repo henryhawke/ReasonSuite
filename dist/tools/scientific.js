@@ -58,8 +58,7 @@ Prefer simpler explanations (Occam/MDL). If tools are allowed: propose concrete 
         description: "Decompose, hypothesize, test with tools, and verify (Popperian falsification).",
         inputSchema,
     };
-    const wrap = (h) => (args, _extra) => h(args);
-    server.registerTool("reasoning.scientific", config, wrap(handler));
-    server.registerTool("reasoning_scientific", config, wrap(handler));
-    server.registerTool("reasoning-scientific", config, wrap(handler));
+    server.registerTool("reasoning.scientific", config, handler);
+    server.registerTool("reasoning_scientific", config, handler);
+    server.registerTool("reasoning-scientific", config, handler);
 }

@@ -63,7 +63,6 @@ Return strict JSON only:
         description: "Given a claim, produce thesis, antithesis, and synthesis with evidence requests.",
         inputSchema,
     };
-    const wrap = (h) => (args, _extra) => h(args);
-    server.registerTool("dialectic.tas", config, wrap(handler));
-    server.registerTool("dialectic_tas", config, wrap(handler));
+    server.registerTool("dialectic.tas", config, handler);
+    server.registerTool("dialectic_tas", config, handler);
 }

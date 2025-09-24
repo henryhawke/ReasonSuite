@@ -62,7 +62,6 @@ Return strict JSON only:
         return { content: [{ type: "text", text }] };
     };
 
-    const wrap = (h: any) => (args: any, _extra: any) => h(args);
     server.registerTool(
         "razors.apply",
         {
@@ -71,7 +70,7 @@ Return strict JSON only:
                 "Given candidate explanations, apply Occam/MDL, Bayesian Occam, Sagan, Hitchens, Hanlon, Popper falsifiability to produce keep/drop recommendations.",
             inputSchema,
         },
-        wrap(handler)
+        handler
     );
     // snake_case alias for wider client compatibility
     server.registerTool(
@@ -82,6 +81,6 @@ Return strict JSON only:
                 "Given candidate explanations, apply Occam/MDL, Bayesian Occam, Sagan, Hitchens, Hanlon, Popper falsifiability to produce keep/drop recommendations.",
             inputSchema,
         },
-        wrap(handler)
+        handler
     );
 }

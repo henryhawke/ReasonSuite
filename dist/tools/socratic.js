@@ -58,8 +58,7 @@ Return strict JSON only:
         description: "Generate a structured series of probing questions to clarify scope, assumptions, and evidence.",
         inputSchema,
     };
-    const wrap = (h) => (args, _extra) => h(args);
-    server.registerTool("socratic.inquire", config, wrap(handler));
-    server.registerTool("socratic_inquire", config, wrap(handler));
-    server.registerTool("socratic-inquire", config, wrap(handler));
+    server.registerTool("socratic.inquire", config, handler);
+    server.registerTool("socratic_inquire", config, handler);
+    server.registerTool("socratic-inquire", config, handler);
 }

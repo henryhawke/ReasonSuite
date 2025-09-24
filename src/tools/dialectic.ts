@@ -73,7 +73,6 @@ Return strict JSON only:
         inputSchema,
     };
 
-    const wrap = (h: any) => (args: any, _extra: any) => h(args);
-    server.registerTool("dialectic.tas", config, wrap(handler));
-    server.registerTool("dialectic_tas", config, wrap(handler));
+    server.registerTool("dialectic.tas", config, handler);
+    server.registerTool("dialectic_tas", config, handler);
 }

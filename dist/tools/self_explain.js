@@ -42,10 +42,9 @@ If citations allowed, include sources; otherwise, note what would be retrieved.`
         });
         return { content: [{ type: "text", text }] };
     };
-    const wrap = (h) => (args, _extra) => h(args);
     server.registerTool("reasoning.self_explain", {
         title: "Transparent Self-Explanation",
         description: "Produce a rationale (chain-of-thought style summary), cite evidence, self-critique, and revise.",
         inputSchema,
-    }, wrap(handler));
+    }, handler);
 }

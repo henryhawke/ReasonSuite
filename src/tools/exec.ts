@@ -19,7 +19,7 @@ const InputSchema = z.object({
 const inputSchema = InputSchema as any;
 
 type InputArgs = z.output<typeof InputSchema>;
-type InputShape = typeof inputShape;
+type InputShape = typeof inputSchema;
 
 function runInSandbox(code: string, timeoutMs: number): ExecResult {
     const stdout: string[] = [];

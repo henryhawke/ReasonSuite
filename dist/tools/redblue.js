@@ -76,8 +76,7 @@ Return strict JSON only:
         description: "Run N rounds of adversarial challenge/defense on a proposal or answer. Returns a transcript + defects + risk matrix.",
         inputSchema,
     };
-    const wrap = (h) => (args, _extra) => h(args);
-    server.registerTool("redblue.challenge", config, wrap(handler));
-    server.registerTool("redblue_challenge", config, wrap(handler));
-    server.registerTool("redblue-challenge", config, wrap(handler));
+    server.registerTool("redblue.challenge", config, handler);
+    server.registerTool("redblue_challenge", config, handler);
+    server.registerTool("redblue-challenge", config, handler);
 }

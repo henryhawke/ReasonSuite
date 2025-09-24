@@ -556,9 +556,8 @@ export function registerSelector(server: McpServer): void {
         inputSchema,
     } as const;
 
-    const wrap = (h: any) => (args: any, _extra: any) => h(args);
-    server.registerTool("reasoning.selector", config as any, wrap(handler));
+    server.registerTool("reasoning.selector", config as any, handler);
     // Provide underscore and dashed aliases for clients that use snake_case/kebab_case naming
-    server.registerTool("reasoning_selector", config as any, wrap(handler));
-    server.registerTool("reasoning-selector", config as any, wrap(handler));
+    server.registerTool("reasoning_selector", config as any, handler);
+    server.registerTool("reasoning-selector", config as any, handler);
 }

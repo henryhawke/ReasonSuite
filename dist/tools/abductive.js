@@ -78,7 +78,7 @@ Return strict JSON only:
         description: "Generate k candidate hypotheses and rank by plausibility, explanatory power, simplicity (MDL proxy), and testability.",
         inputSchema,
     };
-    server.registerTool("abductive.hypothesize", config, (args, _extra) => handler(args));
-    server.registerTool("abductive_hypothesize", config, (args, _extra) => handler(args));
-    server.registerTool("abductive-hypothesize", config, (args, _extra) => handler(args));
+    server.registerTool("abductive.hypothesize", config, handler);
+    server.registerTool("abductive_hypothesize", config, handler);
+    server.registerTool("abductive-hypothesize", config, handler);
 }

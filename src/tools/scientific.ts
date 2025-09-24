@@ -68,8 +68,7 @@ Prefer simpler explanations (Occam/MDL). If tools are allowed: propose concrete 
         inputSchema,
     };
 
-    const wrap = (h: any) => (args: any, _extra: any) => h(args);
-    server.registerTool("reasoning.scientific", config, wrap(handler));
-    server.registerTool("reasoning_scientific", config, wrap(handler));
-    server.registerTool("reasoning-scientific", config, wrap(handler));
+    server.registerTool("reasoning.scientific", config, handler);
+    server.registerTool("reasoning_scientific", config, handler);
+    server.registerTool("reasoning-scientific", config, handler);
 }

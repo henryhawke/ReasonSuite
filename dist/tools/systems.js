@@ -58,7 +58,6 @@ Return strict JSON only:
         description: "Create a causal loop diagram (Mermaid) with candidate reinforcing/balancing loops and leverage points.",
         inputSchema,
     };
-    const wrap = (h) => (args, _extra) => h(args);
-    server.registerTool("systems.map", config, wrap(handler));
-    server.registerTool("systems_map", config, wrap(handler));
+    server.registerTool("systems.map", config, handler);
+    server.registerTool("systems_map", config, handler);
 }

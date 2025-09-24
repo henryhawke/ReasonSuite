@@ -91,7 +91,7 @@ Return strict JSON only:
         inputSchema,
     };
 
-    server.registerTool("abductive.hypothesize", config, (args: any, _extra: any) => handler(args));
-    server.registerTool("abductive_hypothesize", config, (args: any, _extra: any) => handler(args));
-    server.registerTool("abductive-hypothesize", config, (args: any, _extra: any) => handler(args));
+    server.registerTool("abductive.hypothesize", config, handler);
+    server.registerTool("abductive_hypothesize", config, handler);
+    server.registerTool("abductive-hypothesize", config, handler);
 }

@@ -51,16 +51,15 @@ Return strict JSON only:
         });
         return { content: [{ type: "text", text }] };
     };
-    const wrap = (h) => (args, _extra) => h(args);
     server.registerTool("razors.apply", {
         title: "Apply reasoning razors",
         description: "Given candidate explanations, apply Occam/MDL, Bayesian Occam, Sagan, Hitchens, Hanlon, Popper falsifiability to produce keep/drop recommendations.",
         inputSchema,
-    }, wrap(handler));
+    }, handler);
     // snake_case alias for wider client compatibility
     server.registerTool("razors_apply", {
         title: "Apply reasoning razors",
         description: "Given candidate explanations, apply Occam/MDL, Bayesian Occam, Sagan, Hitchens, Hanlon, Popper falsifiability to produce keep/drop recommendations.",
         inputSchema,
-    }, wrap(handler));
+    }, handler);
 }

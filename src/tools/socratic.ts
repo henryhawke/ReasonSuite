@@ -11,7 +11,7 @@ const InputSchema = z.object({
 const inputSchema = InputSchema as any;
 
 type InputArgs = z.output<typeof InputSchema>;
-type InputShape = typeof inputShape;
+type InputShape = typeof inputSchema;
 
 const OutputSchema = z
     .object({
@@ -69,8 +69,7 @@ Return strict JSON only:
         inputSchema,
     } as const;
 
-    const wrap = (h: any) => (args: any, _extra: any) => h(args);
-    server.registerTool("socratic.inquire", config as any, wrap(handler));
-    server.registerTool("socratic_inquire", config as any, wrap(handler));
-    server.registerTool("socratic-inquire", config as any, wrap(handler));
+    server.registerTool("socratic.inquire", config as any, handler);
+    server.registerTool("socratic_inquire", config as any, handler);
+    server.registerTool("socratic-inquire", config as any, handler);
 }

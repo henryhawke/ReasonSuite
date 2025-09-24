@@ -91,8 +91,7 @@ Return strict JSON only:
         inputSchema,
     };
 
-    const wrap = (h: any) => (args: any, _extra: any) => h(args);
-    server.registerTool("redblue.challenge", config, wrap(handler));
-    server.registerTool("redblue_challenge", config, wrap(handler));
-    server.registerTool("redblue-challenge", config, wrap(handler));
+    server.registerTool("redblue.challenge", config, handler);
+    server.registerTool("redblue_challenge", config, handler);
+    server.registerTool("redblue-challenge", config, handler);
 }

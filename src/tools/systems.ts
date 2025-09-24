@@ -68,7 +68,6 @@ Return strict JSON only:
         inputSchema,
     };
 
-    const wrap = (h: any) => (args: any, _extra: any) => h(args);
-    server.registerTool("systems.map", config, wrap(handler));
-    server.registerTool("systems_map", config, wrap(handler));
+    server.registerTool("systems.map", config, handler);
+    server.registerTool("systems_map", config, handler);
 }

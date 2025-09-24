@@ -51,7 +51,6 @@ If citations allowed, include sources; otherwise, note what would be retrieved.`
         return { content: [{ type: "text", text }] };
     };
 
-    const wrap = (h: any) => (args: any, _extra: any) => h(args);
     server.registerTool(
         "reasoning.self_explain",
         {
@@ -59,6 +58,6 @@ If citations allowed, include sources; otherwise, note what would be retrieved.`
             description: "Produce a rationale (chain-of-thought style summary), cite evidence, self-critique, and revise.",
             inputSchema,
         },
-        wrap(handler)
+        handler
     );
 }
