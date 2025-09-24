@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { textResult, type ToolCallback } from "../lib/mcp.js";
 import { DEFAULT_RAZORS, summarizeRazors } from "../lib/razors.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
@@ -38,7 +39,8 @@ const OutputSchema = z
     .extend({ meta: ReasoningMetadataSchema.optional() });
 
 export function registerAbductive(server: McpServer): void {
-    const handler = async ({ observations, k, apply_razors }: any) => {
+    const handler: ToolCallback<any> = async (rawArgs, _extra) => {
+        const { observations, k, apply_razors } = rawArgs as InputArgs;
         const prompt = `Observations:\n${observations}
 
 Generate ${k} abductive hypotheses. Score each on:
@@ -81,7 +83,7 @@ Return strict JSON only:
                 notes: "Deterministic fallback applied; rerun with sampling for richer detail.",
             }),
         });
-        return { content: [{ type: "text", text }] };
+        return textResult(text);
     };
 
     const config = {

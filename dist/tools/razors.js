@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { textResult } from "../lib/mcp.js";
 import { DEFAULT_RAZORS, summarizeRazors } from "../lib/razors.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 const InputSchema = z.object({
@@ -21,7 +22,8 @@ const OutputSchema = z
 })
     .extend({ meta: ReasoningMetadataSchema.optional() });
 export function registerRazors(server) {
-    const handler = async ({ candidates_json, razors }) => {
+    const handler = async (rawArgs, _extra) => {
+        const { candidates_json, razors } = rawArgs;
         const prompt = `Candidates JSON:\n${candidates_json}
 Razors to apply (explain how each affects the verdict):
 ${summarizeRazors(razors)}
@@ -49,7 +51,7 @@ Return strict JSON only:
                 notes: "Deterministic fallback applied; validate candidates_json structure.",
             }),
         });
-        return { content: [{ type: "text", text }] };
+        return textResult(text);
     };
     server.registerTool("razors.apply", {
         title: "Apply reasoning razors",

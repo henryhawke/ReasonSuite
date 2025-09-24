@@ -1,5 +1,6 @@
-import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { textResult, type ToolCallback } from "../lib/mcp.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
 const InputSchema = z.object({
@@ -27,7 +28,8 @@ const OutputSchema = z
     .extend({ meta: ReasoningMetadataSchema.optional() });
 
 export function registerScientific(server: McpServer): void {
-    const handler = async ({ goal, context, allow_tools }: any) => {
+    const handler: ToolCallback<any> = async (rawArgs, _extra) => {
+        const { goal, context, allow_tools } = rawArgs as InputArgs;
         const prompt = `You are an agent following a Scientific Analytic Framework.
 Goal: ${goal}
 Context: ${context ?? ""}
@@ -59,7 +61,7 @@ Prefer simpler explanations (Occam/MDL). If tools are allowed: propose concrete 
                 answer: "Deterministic scaffold—rerun with sampling for richer details.",
             }),
         });
-        return { content: [{ type: "text", text }] };
+        return textResult(text);
     };
 
     const config = {

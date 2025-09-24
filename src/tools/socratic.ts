@@ -1,5 +1,6 @@
-import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { textResult, type ToolCallback } from "../lib/mcp.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
 const InputSchema = z.object({
@@ -23,7 +24,8 @@ const OutputSchema = z
     .extend({ meta: ReasoningMetadataSchema.optional() });
 
 export function registerSocratic(server: McpServer): void {
-    const handler = async ({ topic, context, depth }: any) => {
+    const handler: ToolCallback<any> = async (rawArgs, _extra) => {
+        const { topic, context, depth } = rawArgs as InputArgs;
         const prompt = `Produce a ${depth}-layer Socratic question tree for: "${topic}"
 Context: ${context ?? ""}
 Return strict JSON only:
@@ -60,7 +62,7 @@ Return strict JSON only:
                 };
             },
         });
-        return { content: [{ type: "text", text }] };
+        return textResult(text);
     };
 
     const config = {
@@ -69,7 +71,7 @@ Return strict JSON only:
         inputSchema,
     } as const;
 
-    server.registerTool("socratic.inquire", config as any, handler);
-    server.registerTool("socratic_inquire", config as any, handler);
-    server.registerTool("socratic-inquire", config as any, handler);
+    server.registerTool("socratic.inquire", config, handler);
+    server.registerTool("socratic_inquire", config, handler);
+    server.registerTool("socratic-inquire", config, handler);
 }

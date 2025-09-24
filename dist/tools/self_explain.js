@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { textResult } from "../lib/mcp.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 const InputSchema = z.object({
     query: z.string(),
@@ -14,7 +15,8 @@ const OutputSchema = z
 })
     .extend({ meta: ReasoningMetadataSchema.optional() });
 export function registerSelfExplain(server) {
-    const handler = async ({ query, allow_citations }) => {
+    const handler = async (rawArgs, _extra) => {
+        const { query, allow_citations } = rawArgs;
         const prompt = `Transparent Self-Explanation.
 Query: ${query}
 
@@ -40,7 +42,7 @@ If citations allowed, include sources; otherwise, note what would be retrieved.`
                 revision: "Deterministic fallback answer awaiting richer sampling.",
             }),
         });
-        return { content: [{ type: "text", text }] };
+        return textResult(text);
     };
     server.registerTool("reasoning.self_explain", {
         title: "Transparent Self-Explanation",

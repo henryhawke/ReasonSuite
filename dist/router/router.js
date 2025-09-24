@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { textResult } from "../lib/mcp.js";
 import { DEFAULT_RAZORS } from "../lib/razors.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 import { buildFallback as selectorFallback } from "../tools/selector.js";
@@ -33,25 +34,60 @@ const InputSchema = z.object({
     context: z.string().optional(),
     maxSteps: z.number().int().positive().max(8).default(4),
 });
-const inputShape = InputSchema.shape;
+const inputShape = InputSchema;
+const SIGNAL_DESCRIPTIONS = {
+    needsHypotheses: "Diagnosis / uncertainty cues detected → schedule abductive.hypothesize to explore explanations.",
+    needsCreative: "Creative or brainstorming language detected → add reasoning.divergent_convergent for option generation.",
+    needsSystems: "Systemic / feedback terminology detected → include systems.map to surface loops and leverage points.",
+    needsConstraint: "Constraint or optimisation keywords detected → include constraint.solve for feasibility checking.",
+    needsRisk: "Risk, safety, or abuse terms detected → run redblue.challenge before finalising outcomes.",
+    contested: "Controversy or trade-off language detected → use dialectic.tas to examine opposing positions.",
+    wantsAnalogy: "Analogy or comparison cues detected → include analogical.map to transfer structure carefully.",
+    needsScientific: "Experiment / evidence requests detected → include reasoning.scientific for test planning.",
+    wantsSelfExplain: "Transparency / rationale requests detected → finish with reasoning.self_explain.",
+    codeOrCalc: "Code or computation keywords detected → schedule exec.run for sandboxed verification.",
+    deepScope: "Complex strategy / roadmap wording detected → use a deeper socratic.inquire depth setting.",
+};
 export function registerRouter(server) {
-    const handler = async ({ task, context, maxSteps }) => {
+    const handler = async (rawArgs, _extra) => {
+        const { task, context, maxSteps } = rawArgs;
+        const signals = detectSignals(task, context);
+        const heuristicsList = summarizeSignals(signals);
+        const heuristicsBlock = heuristicsList.length
+            ? heuristicsList.map((entry) => `- ${entry}`).join("\n")
+            : "- No strong automatic signals detected; default to Socratic clarification first.";
+        const modeReference = [
+            "socratic.inquire — clarify scope, assumptions, and success criteria (usually first)",
+            "abductive.hypothesize — generate and rank explanations when the cause is uncertain",
+            "razors.apply — prune or revise ideas using Occam/Hitchens/Popper-style tests",
+            "systems.map — map feedback loops, stocks/flows, and leverage points",
+            "analogical.map — transfer structure across domains while flagging mismatches",
+            "constraint.solve — check feasibility against numeric or logical limits",
+            "redblue.challenge — stress-test for safety, bias, or attack scenarios",
+            "dialectic.tas — analyse thesis vs antithesis and reconcile trade-offs",
+            "reasoning.scientific — decompose goals, plan experiments, and verify evidence",
+            "reasoning.self_explain — produce transparent rationale, evidence, critique, revision",
+            "reasoning.divergent_convergent — brainstorm options then converge with scoring",
+            "exec.run — execute sandboxed JavaScript for quick calculations or prototypes",
+        ].join("\n");
         const prompt = `You are a planning assistant that selects reasoning tools for an autonomous analyst.
-Available modes and their corresponding tool IDs:
-- socratic -> socratic.inquire (scope + assumptions)
-- abductive -> abductive.hypothesize (generate hypotheses)
-- razors.apply -> razors.apply (Occam/Hitchens/Popper screening)
-- systems -> systems.map (causal loop diagram)
-- analogical -> analogical.map (transfer structure)
-- constraint -> constraint.solve (formulate/solve constraints)
-- redblue -> redblue.challenge (adversarial review)
-- dialectic -> dialectic.tas (thesis/antithesis/synthesis)
-- scientific -> reasoning.scientific (decompose + tests)
-- self_explain -> reasoning.self_explain (transparent rationale)
-- divergent -> reasoning.divergent_convergent (brainstorm then converge)
-- exec -> exec.run (sandboxed JS experiments)
+
+Mode quick reference (tool → cue):
+${modeReference}
+
+Heuristic signals detected for this request:
+${heuristicsBlock}
+
 Task: ${task}
-Context: ${context ?? ""}
+Context: ${context ?? "(none)"}
+
+Planning rules:
+- Limit the plan to ${maxSteps} steps.
+- Always begin with socratic.inquire unless the question is already fully specified.
+- Whenever you add abductive or divergent steps, schedule razors.apply immediately afterwards.
+- Insert redblue.challenge before final answers when risk, safety, or deployment concerns appear.
+- Provide short "why" rationales and populate args as JSON objects (use {} when no parameters are needed).
+- Use notes to flag limitations, dependencies, or follow-up actions in one sentence.
 
 Return strict JSON only:
 {
@@ -59,8 +95,7 @@ Return strict JSON only:
     {"mode":"...","tool":"tool.id","why":"...","args":{}}
   ],
   "notes": "one-line on expected limitations"
-}
-Limit steps to ${maxSteps}. Always start by clarifying scope (socratic) unless the task is already extremely specific. Prefer constraint when explicit numeric/logical limits or optimisation keywords appear. Prefer systems when many interacting variables, feedback, or dynamics are mentioned. Prefer abductive for incomplete evidence or diagnosis tasks and schedule razors.apply immediately after any generative hypothesis/idea step. Use redblue for safety, risk, or deployment checks before final answers. Use analogical when a source domain is provided or comparative reasoning is requested. Invoke scientific when experiments/tests/data validation are required. Include tool IDs in the plan.`;
+}`;
         const { text } = await sampleStructuredJson({
             server,
             prompt,
@@ -68,7 +103,7 @@ Limit steps to ${maxSteps}. Always start by clarifying scope (socratic) unless t
             schema: PlanSchema,
             fallback: () => buildHeuristicPlan(task, context, maxSteps),
         });
-        return { content: [{ type: "text", text }] };
+        return textResult(text);
     };
     server.registerTool("reasoning.router.plan", {
         title: "Plan reasoning approach",
@@ -76,32 +111,43 @@ Limit steps to ${maxSteps}. Always start by clarifying scope (socratic) unless t
         inputSchema: inputShape,
     }, handler);
 }
-function buildHeuristicPlan(task, context, maxSteps) {
+function detectSignals(task, context) {
     const normalized = `${task} ${context ?? ""}`.toLowerCase();
+    const contains = (pattern) => pattern.test(normalized);
+    return {
+        needsHypotheses: contains(/diagnos|root cause|why|uncertain|hypothesis|investigat|anomal/),
+        needsCreative: contains(/brainstorm|idea|innov|option|alternativ|explore/),
+        needsSystems: contains(/system|feedback|loop|dynamics|ecosystem|supply|demand|stock|flow/),
+        needsConstraint: contains(/constraint|optimi[sz]e|allocate|schedule|budget|limit|maximize|minimize|>=|<=|\b\d+/),
+        needsRisk: contains(/risk|safety|security|privacy|abuse|attack|hazard|failure|compliance|bias/),
+        contested: contains(/trade-?off|controvers|policy|ethic|disagree|stakeholder|debate/),
+        wantsAnalogy: contains(/analogy|analog|similar to|compare|precedent|case study/),
+        needsScientific: contains(/experiment|test|measurement|data|evidence|validate/),
+        wantsSelfExplain: contains(/explain|rationale|justify|transparent|walkthrough/),
+        codeOrCalc: contains(/code|script|function|regex|compute|calculate|algorithm|typescript|javascript|json/),
+        deepScope: contains(/complex|strategy|roadmap/),
+    };
+}
+function summarizeSignals(signals) {
+    return Object.entries(signals)
+        .filter(([, active]) => active)
+        .map(([key]) => SIGNAL_DESCRIPTIONS[key]);
+}
+function buildHeuristicPlan(task, context, maxSteps) {
+    const signals = detectSignals(task, context);
     const steps = [];
     const push = (step) => {
         if (steps.length >= maxSteps)
             return;
         steps.push(step);
     };
-    const contains = (pattern) => pattern.test(normalized);
     push({
         mode: "socratic",
         tool: "socratic.inquire",
         why: "Clarify scope, success criteria, and hidden assumptions",
-        args: { depth: contains(/complex|strategy|roadmap/) ? 3 : 2 },
+        args: { depth: signals.deepScope ? 3 : 2 },
     });
-    const needsHypotheses = contains(/diagnos|root cause|why|uncertain|hypothesis|investigat|anomal/);
-    const needsCreative = contains(/brainstorm|idea|innov|option|alternativ|explore/);
-    const needsSystems = contains(/system|feedback|loop|dynamics|ecosystem|supply|demand|stock|flow/);
-    const needsConstraint = contains(/constraint|optimi[sz]e|allocate|schedule|budget|limit|maximize|minimize|>=|<=|\b\d+/);
-    const needsRisk = contains(/risk|safety|security|privacy|abuse|attack|hazard|failure|compliance|bias/);
-    const contested = contains(/trade-?off|controvers|policy|ethic|disagree|stakeholder|debate/);
-    const wantsAnalogy = contains(/analogy|analog|similar to|compare|precedent|case study/);
-    const needsScientific = contains(/experiment|test|measurement|data|evidence|validate/);
-    const wantsSelfExplain = contains(/explain|rationale|justify|transparent|walkthrough/);
-    const codeOrCalc = contains(/code|script|function|regex|compute|calculate|algorithm|typescript|javascript|json/);
-    if (needsCreative) {
+    if (signals.needsCreative) {
         push({
             mode: "divergent",
             tool: "reasoning.divergent_convergent",
@@ -109,15 +155,15 @@ function buildHeuristicPlan(task, context, maxSteps) {
             args: { prompt: task, k: Math.min(5, Math.max(3, maxSteps)) },
         });
     }
-    if (needsHypotheses) {
+    if (signals.needsHypotheses) {
         push({
             mode: "abductive",
             tool: "abductive.hypothesize",
             why: "Generate and score candidate explanations",
-            args: { k: needsCreative ? 5 : 4, apply_razors: [...DEFAULT_RAZORS] },
+            args: { k: signals.needsCreative ? 5 : 4, apply_razors: [...DEFAULT_RAZORS] },
         });
     }
-    if (needsSystems) {
+    if (signals.needsSystems) {
         push({
             mode: "systems",
             tool: "systems.map",
@@ -125,7 +171,7 @@ function buildHeuristicPlan(task, context, maxSteps) {
             args: { variables: [] },
         });
     }
-    if (wantsAnalogy) {
+    if (signals.wantsAnalogy) {
         push({
             mode: "analogical",
             tool: "analogical.map",
@@ -133,7 +179,7 @@ function buildHeuristicPlan(task, context, maxSteps) {
             args: {},
         });
     }
-    if (needsConstraint) {
+    if (signals.needsConstraint) {
         push({
             mode: "constraint",
             tool: "constraint.solve",
@@ -141,7 +187,7 @@ function buildHeuristicPlan(task, context, maxSteps) {
             args: { model_json: "" },
         });
     }
-    if (needsScientific) {
+    if (signals.needsScientific) {
         push({
             mode: "scientific",
             tool: "reasoning.scientific",
@@ -149,7 +195,7 @@ function buildHeuristicPlan(task, context, maxSteps) {
             args: { allow_tools: true },
         });
     }
-    if (codeOrCalc) {
+    if (signals.codeOrCalc) {
         push({
             mode: "exec",
             tool: "exec.run",
@@ -157,7 +203,7 @@ function buildHeuristicPlan(task, context, maxSteps) {
             args: { timeout_ms: 1500 },
         });
     }
-    if (wantsSelfExplain) {
+    if (signals.wantsSelfExplain) {
         push({
             mode: "self_explain",
             tool: "reasoning.self_explain",
@@ -165,7 +211,7 @@ function buildHeuristicPlan(task, context, maxSteps) {
             args: { allow_citations: true },
         });
     }
-    if (contested) {
+    if (signals.contested) {
         push({
             mode: "dialectic",
             tool: "dialectic.tas",
@@ -173,7 +219,7 @@ function buildHeuristicPlan(task, context, maxSteps) {
             args: { audience: "general" },
         });
     }
-    if (needsRisk) {
+    if (signals.needsRisk) {
         push({
             mode: "redblue",
             tool: "redblue.challenge",
@@ -190,7 +236,7 @@ function buildHeuristicPlan(task, context, maxSteps) {
             args: { razors: [...DEFAULT_RAZORS] },
         });
     }
-    if (!steps.some((step) => step.mode === "dialectic") && contested && steps.length < maxSteps) {
+    if (!steps.some((step) => step.mode === "dialectic") && signals.contested && steps.length < maxSteps) {
         push({
             mode: "dialectic",
             tool: "dialectic.tas",
@@ -245,8 +291,11 @@ function buildHeuristicPlan(task, context, maxSteps) {
             });
         }
     }
+    const triggered = summarizeSignals(signals);
     return {
         steps,
-        notes: "Heuristic fallback generated from keyword analysis; rerun with sampling for nuanced sequencing.",
+        notes: triggered.length > 0
+            ? `Heuristic fallback triggered: ${triggered.join("; ")}.`
+            : "Heuristic fallback generated from keyword analysis; rerun with sampling for nuance.",
     };
 }

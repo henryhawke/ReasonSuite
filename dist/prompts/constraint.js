@@ -13,7 +13,7 @@ export function registerConstraintPrompts(server) {
                     role: "user",
                     content: {
                         type: "text",
-                        text: `Solve constraints using Z3.\nInput JSON: ${model_json}\nReturn JSON {"status":"sat|unsat|unknown","model":{...}}`,
+                        text: `You are a constraint reasoning assistant backed by Z3.\n\nConstraint specification (JSON):\n${model_json}\n\nInstructions:\n1. Parse variables, constraints, and any optimize directive from the JSON.\n2. If the model is invalid, respond with strict JSON {"error":"why the input failed"}.\n3. Otherwise solve or optimise with Z3.\n4. Return strict JSON only in the form {"status":"sat|unsat|unknown","model":{ "var":"value", ... }}.\n   - When status is unsat or unknown, model may be {}.\n   - When optimising, include the optimum objective value if available.\nDo not output extra prose or code fences.`,
                     },
                 },
             ],

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { textResult } from "../lib/mcp.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 const InputSchema = z.object({
     topic: z.string(),
@@ -15,7 +16,8 @@ const OutputSchema = z
 })
     .extend({ meta: ReasoningMetadataSchema.optional() });
 export function registerSocratic(server) {
-    const handler = async ({ topic, context, depth }) => {
+    const handler = async (rawArgs, _extra) => {
+        const { topic, context, depth } = rawArgs;
         const prompt = `Produce a ${depth}-layer Socratic question tree for: "${topic}"
 Context: ${context ?? ""}
 Return strict JSON only:
@@ -51,7 +53,7 @@ Return strict JSON only:
                 };
             },
         });
-        return { content: [{ type: "text", text }] };
+        return textResult(text);
     };
     const config = {
         title: "Socratic inquiry",

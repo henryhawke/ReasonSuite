@@ -15,7 +15,7 @@ export function registerAnalogicalPrompts(server) {
                     role: "user",
                     content: {
                         type: "text",
-                        text: `Build a structural analogy from SOURCE to TARGET.\n\nSOURCE: ${source_domain}\nTARGET: ${target_problem}\nCONSTRAINTS: ${constraints ?? ""}\n\nReturn JSON mapping, shared_relations, mismatches, transferable_insights, failure_modes.`,
+                        text: `Act as an analogy architect.\n\nSOURCE DOMAIN:\n${source_domain}\n\nTARGET PROBLEM:\n${target_problem}\n\nCONSTRAINTS OR MUST-HAVES:\n${constraints ?? "(none provided)"}\n\nSteps to follow:\n1. Identify the core entities, relationships, and dynamics in the source domain.\n2. Map each relevant source element to the most plausible target counterpart and justify the mapping.\n3. List structural relations that transfer cleanly.\n4. Flag mismatches or missing components that could break the analogy.\n5. Summarize transferable_insights and highlight failure_modes or cautionary tales.\n\nRespond with strict JSON matching:\n{"mapping":[{"source":"...","target":"...","justification":"..."}],"shared_relations":["..."],"mismatches":["..."],"transferable_insights":["..."],"failure_modes":["..."]}\nNo additional explanation outside the JSON payload.`,
                     },
                 },
             ],

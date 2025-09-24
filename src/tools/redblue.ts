@@ -1,5 +1,6 @@
-import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { textResult, type ToolCallback } from "../lib/mcp.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
 const InputSchema = z.object({
@@ -46,7 +47,8 @@ const OutputSchema = z
     .extend({ meta: ReasoningMetadataSchema.optional() });
 
 export function registerRedBlue(server: McpServer): void {
-    const handler = async ({ proposal, rounds, focus }: any) => {
+    const handler: ToolCallback<any> = async (rawArgs, _extra) => {
+        const { proposal, rounds, focus } = rawArgs as InputArgs;
         const prompt = `Conduct ${rounds} rounds of Red (attack) vs Blue (defense) on:
 ${proposal}
 
@@ -81,7 +83,7 @@ Return strict JSON only:
                 final_guidance: ["Close medium risks", "Schedule re-test after mitigations"],
             }),
         });
-        return { content: [{ type: "text", text }] };
+        return textResult(text);
     };
 
     const config = {

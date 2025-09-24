@@ -1,5 +1,6 @@
-import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { textResult, type ToolCallback } from "../lib/mcp.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
 const InputSchema = z.object({
@@ -22,7 +23,8 @@ const OutputSchema = z
     .extend({ meta: ReasoningMetadataSchema.optional() });
 
 export function registerSelfExplain(server: McpServer): void {
-    const handler = async ({ query, allow_citations }: any) => {
+    const handler: ToolCallback<any> = async (rawArgs, _extra) => {
+        const { query, allow_citations } = rawArgs as InputArgs;
         const prompt = `Transparent Self-Explanation.
 Query: ${query}
 
@@ -48,7 +50,7 @@ If citations allowed, include sources; otherwise, note what would be retrieved.`
                 revision: "Deterministic fallback answer awaiting richer sampling.",
             }),
         });
-        return { content: [{ type: "text", text }] };
+        return textResult(text);
     };
 
     server.registerTool(

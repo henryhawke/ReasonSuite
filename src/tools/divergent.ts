@@ -1,5 +1,6 @@
-import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { textResult, type ToolCallback } from "../lib/mcp.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
 const InputSchema = z.object({
@@ -31,10 +32,11 @@ const OutputSchema = z
     .extend({ meta: ReasoningMetadataSchema.optional() });
 
 export function registerDivergent(server: McpServer): void {
-    const handler = async ({ prompt, k, criteria }: any) => {
+    const handler: ToolCallback<any> = async (rawArgs, _extra) => {
+        const { prompt, k, criteria } = rawArgs as InputArgs;
         const activeCriteria = criteria?.length ? criteria : ["novelty", "consistency", "relevance"];
 
-        const text = `Divergent then Convergent.
+        const promptText = `Divergent then Convergent.
 Task: ${prompt}
 Candidates: ${k}
 Criteria: ${activeCriteria.join(", ")}
@@ -48,24 +50,9 @@ Return strict JSON only:
 }`;
         const { text: resultText } = await sampleStructuredJson({
             server,
-            prompt: text,
+            prompt: promptText,
             maxTokens: 900,
-            schema: z
-                .object({
-                    divergent: z.array(z.string()).default([]),
-                    scores: z
-                        .array(
-                            z.object({
-                                id: z.number().int(),
-                                by: z.record(z.string(), z.number()),
-                                notes: z.string().optional(),
-                            })
-                        )
-                        .default([]),
-                    winner: z.object({ id: z.number().int(), why: z.string() }),
-                    synthesis: z.string(),
-                })
-                .extend({ meta: ReasoningMetadataSchema.optional() }),
+            schema: OutputSchema,
             fallback: () => ({
                 divergent: Array.from({ length: Math.min(k, 5) }, (_, idx) => `Idea ${idx + 1} for ${prompt}`),
                 scores: [
@@ -79,7 +66,7 @@ Return strict JSON only:
                 synthesis: "Combine leading idea with mitigations.",
             }),
         });
-        return { content: [{ type: "text", text: resultText }] };
+        return textResult(resultText);
     };
 
     const config = {

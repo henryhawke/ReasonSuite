@@ -1,5 +1,6 @@
-import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { textResult, type ToolCallback } from "../lib/mcp.js";
 import { DEFAULT_RAZORS, summarizeRazors } from "../lib/razors.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
@@ -31,7 +32,8 @@ const OutputSchema = z
     .extend({ meta: ReasoningMetadataSchema.optional() });
 
 export function registerRazors(server: McpServer): void {
-    const handler = async ({ candidates_json, razors }: any) => {
+    const handler: ToolCallback<any> = async (rawArgs, _extra) => {
+        const { candidates_json, razors } = rawArgs as InputArgs;
         const prompt = `Candidates JSON:\n${candidates_json}
 Razors to apply (explain how each affects the verdict):
 ${summarizeRazors(razors)}
@@ -59,7 +61,7 @@ Return strict JSON only:
                 notes: "Deterministic fallback applied; validate candidates_json structure.",
             }),
         });
-        return { content: [{ type: "text", text }] };
+        return textResult(text);
     };
 
     server.registerTool(

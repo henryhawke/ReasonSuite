@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { textResult } from "../lib/mcp.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 const InputSchema = z.object({
     claim: z.string(),
@@ -20,7 +21,8 @@ const OutputSchema = z
 })
     .extend({ meta: ReasoningMetadataSchema.optional() });
 export function registerDialectic(server) {
-    const handler = async ({ claim, context, audience }) => {
+    const handler = async (rawArgs, _extra) => {
+        const { claim, context, audience } = rawArgs;
         const prompt = `Use a dialectical frame.
 Claim: ${claim}
 Context: ${context ?? ""}
@@ -56,7 +58,7 @@ Return strict JSON only:
                 open_questions: ["Which stakeholder perspectives are under-represented?"],
             }),
         });
-        return { content: [{ type: "text", text }] };
+        return textResult(text);
     };
     const config = {
         title: "Dialectic (Thesis–Antithesis–Synthesis)",

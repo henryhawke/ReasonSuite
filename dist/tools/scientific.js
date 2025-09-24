@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { textResult } from "../lib/mcp.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 const InputSchema = z.object({
     goal: z.string().describe("Problem to solve"),
@@ -19,7 +20,8 @@ const OutputSchema = z
 })
     .extend({ meta: ReasoningMetadataSchema.optional() });
 export function registerScientific(server) {
-    const handler = async ({ goal, context, allow_tools }) => {
+    const handler = async (rawArgs, _extra) => {
+        const { goal, context, allow_tools } = rawArgs;
         const prompt = `You are an agent following a Scientific Analytic Framework.
 Goal: ${goal}
 Context: ${context ?? ""}
@@ -51,7 +53,7 @@ Prefer simpler explanations (Occam/MDL). If tools are allowed: propose concrete 
                 answer: "Deterministic scaffold—rerun with sampling for richer details.",
             }),
         });
-        return { content: [{ type: "text", text }] };
+        return textResult(text);
     };
     const config = {
         title: "Scientific Analytic Framework",

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { textResult } from "../lib/mcp.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 const InputSchema = z.object({
     variables: z.array(z.string()).describe("Known variables").default([]),
@@ -18,7 +19,8 @@ const OutputSchema = z
 })
     .extend({ meta: ReasoningMetadataSchema.optional() });
 export function registerSystems(server) {
-    const handler = async ({ variables, context }) => {
+    const handler = async (rawArgs, _extra) => {
+        const { variables, context } = rawArgs;
         const prompt = `Build a concise causal loop diagram (CLD) for the system below.
 Variables: ${variables.join(", ") || "(discover reasonable variables)"}
 Context: ${context ?? ""}
@@ -51,7 +53,7 @@ Return strict JSON only:
                 risks: ["Hidden delays or non-linearities"],
             }),
         });
-        return { content: [{ type: "text", text }] };
+        return textResult(text);
     };
     const config = {
         title: "Systems map (CLD)",

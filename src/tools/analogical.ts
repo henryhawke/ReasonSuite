@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { textResult, type ToolCallback } from "../lib/mcp.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
 const InputSchema = z.object({
@@ -32,7 +33,8 @@ const OutputSchema = z
     .extend({ meta: ReasoningMetadataSchema.optional() });
 
 export function registerAnalogical(server: McpServer): void {
-    const handler = async ({ source_domain, target_problem, constraints }: any) => {
+    const handler: ToolCallback<any> = async (rawArgs, _extra) => {
+        const { source_domain, target_problem, constraints } = rawArgs as InputArgs;
         const prompt = `Build a structural analogy from SOURCE to TARGET.
 
 SOURCE: ${source_domain}
@@ -66,7 +68,7 @@ JSON only:
                 failure_modes: ["Surface-level analogy misses hidden variable", "Target lacks enabling infrastructure"],
             }),
         });
-        return { content: [{ type: "text", text }] };
+        return textResult(text);
     };
 
     const config = {

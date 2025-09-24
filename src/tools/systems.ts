@@ -1,5 +1,6 @@
-import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { textResult, type ToolCallback } from "../lib/mcp.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
 const InputSchema = z.object({
@@ -26,7 +27,8 @@ const OutputSchema = z
     .extend({ meta: ReasoningMetadataSchema.optional() });
 
 export function registerSystems(server: McpServer): void {
-    const handler = async ({ variables, context }: any) => {
+    const handler: ToolCallback<any> = async (rawArgs, _extra) => {
+        const { variables, context } = rawArgs as InputArgs;
         const prompt = `Build a concise causal loop diagram (CLD) for the system below.
 Variables: ${variables.join(", ") || "(discover reasonable variables)"}
 Context: ${context ?? ""}
@@ -59,7 +61,7 @@ Return strict JSON only:
                 risks: ["Hidden delays or non-linearities"],
             }),
         });
-        return { content: [{ type: "text", text }] };
+        return textResult(text);
     };
 
     const config = {

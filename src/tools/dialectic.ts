@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { textResult, type ToolCallback } from "../lib/mcp.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
 const InputSchema = z.object({
@@ -28,7 +29,8 @@ const OutputSchema = z
     .extend({ meta: ReasoningMetadataSchema.optional() });
 
 export function registerDialectic(server: McpServer): void {
-    const handler = async ({ claim, context, audience }: any) => {
+    const handler: ToolCallback<any> = async (rawArgs, _extra) => {
+        const { claim, context, audience } = rawArgs as InputArgs;
         const prompt = `Use a dialectical frame.
 Claim: ${claim}
 Context: ${context ?? ""}
@@ -64,7 +66,7 @@ Return strict JSON only:
                 open_questions: ["Which stakeholder perspectives are under-represented?"],
             }),
         });
-        return { content: [{ type: "text", text }] };
+        return textResult(text);
     };
 
     const config = {

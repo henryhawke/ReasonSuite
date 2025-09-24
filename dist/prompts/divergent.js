@@ -9,13 +9,15 @@ const argsShape = definePromptArgsShape(ArgsSchema.shape);
 export function registerDivergentPrompts(server) {
     const callback = ((extra) => {
         const { prompt, k, criteria } = extra?.params ?? {};
+        const ideaCount = k ?? "5";
+        const critList = criteria ?? "novelty,consistency,relevance";
         return {
             messages: [
                 {
                     role: "user",
                     content: {
                         type: "text",
-                        text: `Divergent (ideas) then Convergent (scoring).\nTask: ${prompt}\nK: ${k ?? "5"}\nCriteria: ${criteria ?? "novelty,consistency,relevance"}\nReturn JSON with divergent, scores, winner, synthesis.`,
+                        text: `Run a divergent then convergent reasoning loop.\n\nProblem to explore:\n${prompt}\n\nNumber of initial ideas: ${ideaCount}\nScoring criteria (0-1): ${critList}\n\nProcess:\n1. Brainstorm ${ideaCount} distinct ideas or options related to the task (allow short bullet phrases).\n2. Score each idea against every listed criterion between 0 and 1. Capture short evaluator notes if useful.\n3. Identify the winner with an explanation of why it leads.\n4. Provide a synthesis that combines the best elements or next steps.\n\nRespond with strict JSON only:\n{"divergent":["idea1","idea2"],"scores":[{"id":1,"by":{"novelty":0.7,"consistency":0.6},"notes":"..."}],"winner":{"id":1,"why":"..."},"synthesis":"..."}\nDo not emit extra commentary beyond the JSON.`,
                     },
                 },
             ],
