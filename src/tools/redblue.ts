@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { textResult, type ToolCallback } from "../lib/mcp.js";
+import { STRICT_JSON_REMINDER } from "../lib/prompt.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
 const InputSchema = z.object({
@@ -53,7 +54,16 @@ export function registerRedBlue(server: McpServer): void {
 ${proposal}
 
 Focus areas: ${focus.join(", ")}.
-Return strict JSON only:
+
+Deliberation steps:
+1. For each round capture the red attack (most concerning failure mode) and the blue defense with mitigation list.
+2. Aggregate defects with type, severity (low|med|high), and supporting evidence.
+3. Populate a risk_matrix listing low/medium/high risks.
+4. Provide final_guidance actions or sign-off criteria.
+
+${STRICT_JSON_REMINDER}
+
+JSON schema to emit:
 {
  "rounds":[
    {"n":1,"red":{"attack":"..."}, "blue":{"defense":"...","mitigations":["..."]}}
@@ -61,7 +71,8 @@ Return strict JSON only:
  "defects":[{"type":"...","severity":"low|med|high","evidence":"..."}],
  "risk_matrix":{"low":[],"medium":[],"high":[]},
  "final_guidance":["..."]
-}`;
+}
+Return only that JSON object.`;
         const { text } = await sampleStructuredJson({
             server,
             prompt,

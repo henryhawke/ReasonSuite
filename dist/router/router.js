@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { textResult } from "../lib/mcp.js";
+import { STRICT_JSON_REMINDER } from "../lib/prompt.js";
 import { DEFAULT_RAZORS } from "../lib/razors.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 import { buildFallback as selectorFallback } from "../tools/selector.js";
@@ -89,13 +90,23 @@ Planning rules:
 - Provide short "why" rationales and populate args as JSON objects (use {} when no parameters are needed).
 - Use notes to flag limitations, dependencies, or follow-up actions in one sentence.
 
-Return strict JSON only:
+Deliberation steps:
+1. Summarize the goal/context internally and check if socratic clarification is still needed.
+2. Evaluate each heuristic signal and decide which modes are essential within the ${maxSteps}-step cap.
+3. Sequence the modes so clarifying/creative steps precede evaluation, and verification/risk steps precede conclusions.
+4. Fill args with the minimal structured parameters each tool needs (e.g., depth for socratic, focus arrays for redblue).
+5. Confirm razors.apply follows any hypothesis/ideation generator and avoid duplicate modes unless justified.
+
+${STRICT_JSON_REMINDER}
+
+JSON schema to emit:
 {
   "steps": [
     {"mode":"...","tool":"tool.id","why":"...","args":{}}
   ],
   "notes": "one-line on expected limitations"
-}`;
+}
+Return only that JSON object.`;
         const { text } = await sampleStructuredJson({
             server,
             prompt,

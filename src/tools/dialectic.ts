@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { textResult, type ToolCallback } from "../lib/mcp.js";
+import { STRICT_JSON_REMINDER } from "../lib/prompt.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
 const InputSchema = z.object({
@@ -36,13 +37,22 @@ Claim: ${claim}
 Context: ${context ?? ""}
 Audience: ${audience}
 
-Return strict JSON only:
+Deliberation steps:
+1. Summarise the strongest thesis supporting the claim with concrete key_points.
+2. Develop the strongest antithesis highlighting counterarguments, missing evidence, or risks.
+3. Craft a synthesis that reconciles or updates the claim, including proposal, assumptions, tradeoffs, and evidence_needed.
+4. List remaining open_questions that must be addressed.
+
+${STRICT_JSON_REMINDER}
+
+JSON schema to emit:
 {
  "thesis": {"position": "...", "key_points": ["..."]},
  "antithesis": {"position": "...", "key_points": ["..."]},
 "synthesis": {"proposal": "...", "assumptions": ["..."], "tradeoffs": ["..."], "evidence_needed": ["..."]},
 "open_questions": ["..."]
-}`;
+}
+Return only that JSON object.`;
         const { text } = await sampleStructuredJson({
             server,
             prompt,

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { definePromptArgsShape } from "../lib/prompt.js";
+import { definePromptArgsShape, STRICT_JSON_REMINDER } from "../lib/prompt.js";
 const ArgsSchema = z.object({
     proposal: z.string(),
     rounds: z.string().optional(),
@@ -17,7 +17,7 @@ export function registerRedBluePrompts(server) {
                     role: "user",
                     content: {
                         type: "text",
-                        text: `Run a structured red team vs blue team exercise.\n\nProposal under review:\n${proposal}\n\nNumber of rounds: ${roundCount}\nFocus areas: ${focusList}\n\nFor each round perform: red.attack (describe the most concerning failure mode) and blue.defense (describe mitigation plus mitigations list).\nAfter all rounds:\n- List aggregated defects with type, severity (low|med|high), and supporting evidence.\n- Populate a risk_matrix with arrays for low, medium, and high risks.\n- Provide final_guidance actions or sign-off criteria.\n\nRespond with strict JSON only:\n{"rounds":[{"n":1,"red":{"attack":"..."},"blue":{"defense":"...","mitigations":["..."]}}],"defects":[{"type":"...","severity":"low","evidence":"..."}],"risk_matrix":{"low":["..."],"medium":["..."],"high":["..."]},"final_guidance":["..."]}\nDo not add extra narrative outside the JSON.`,
+                        text: `Run a structured red team vs blue team exercise.\n\nProposal under review:\n${proposal}\n\nNumber of rounds: ${roundCount}\nFocus areas: ${focusList}\n\nDeliberation steps:\n1. For each round capture red.attack (most concerning failure mode) then blue.defense (mitigations + mitigations list).\n2. Aggregate defects with type, severity (low|med|high), and supporting evidence.\n3. Populate a risk_matrix listing low/medium/high risks.\n4. Provide final_guidance actions or sign-off criteria.\n${STRICT_JSON_REMINDER}\n\nJSON schema to emit:\n{"rounds":[{"n":1,"red":{"attack":"..."},"blue":{"defense":"...","mitigations":["..."]}}],"defects":[{"type":"...","severity":"low","evidence":"..."}],"risk_matrix":{"low":["..."],"medium":["..."],"high":["..."]},"final_guidance":["..."]}\nReturn only that JSON object.`,
                     },
                 },
             ],

@@ -1,6 +1,6 @@
 import type { McpServer, PromptCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { definePromptArgsShape } from "../lib/prompt.js";
+import { definePromptArgsShape, STRICT_JSON_REMINDER } from "../lib/prompt.js";
 
 const ArgsSchema = z.object({
     goal: z.string(),
@@ -20,7 +20,7 @@ export function registerScientificPrompts(server: McpServer): void {
                     role: "user" as const,
                     content: {
                         type: "text" as const,
-                        text: `Follow the ReasonSuite scientific analysis cadence.\n\nGoal:\n${goal}\n\nContext or known constraints:\n${context ?? "(none)"}\nTools allowed now? ${toolsFlag}\n\nProcedure:\n1. Decomposition – break the goal into manageable sub-problems or questions.\n2. Hypotheses – list candidate explanations or solution directions to test.\n3. Tests – propose concrete experiments, code executions, constraint checks, or observations (prefer tool calls if allow_tools is true).\n4. Verification – describe how falsification or validation will occur (Popper style).\n5. Answer – deliver the best current conclusion with caveats.\n\nRespond with strict JSON only:\n{"decomposition":["..."],"hypotheses":["..."],"tests":["..."],"verification":{"strategy":"...","popper_falsification":"..."},"answer":"..."}\nAvoid extra commentary outside the JSON.`,
+                        text: `Follow the ReasonSuite scientific analysis cadence.\n\nGoal:\n${goal}\n\nContext or known constraints:\n${context ?? "(none)"}\nTools allowed now? ${toolsFlag}\n\nDeliberation steps:\n1. Decomposition – break the goal into manageable sub-problems or questions.\n2. Hypotheses – list candidate explanations or solution directions to test.\n3. Tests – propose concrete experiments, code executions, constraint checks, or observations (prefer tool calls if allow_tools is true).\n4. Verification – describe how falsification or validation will occur (Popper style).\n5. Answer – deliver the best current conclusion with caveats.\n${STRICT_JSON_REMINDER}\n\nJSON schema to emit:\n{"decomposition":["..."],"hypotheses":["..."],"tests":["..."],"verification":{"strategy":"...","popper_falsification":"..."},"answer":"..."}\nReturn only that JSON object.`,
                     },
                 },
             ],

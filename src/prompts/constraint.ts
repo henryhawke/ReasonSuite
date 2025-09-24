@@ -1,6 +1,6 @@
 import type { McpServer, PromptCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { definePromptArgsShape } from "../lib/prompt.js";
+import { definePromptArgsShape, STRICT_JSON_REMINDER } from "../lib/prompt.js";
 
 const ArgsSchema = z.object({
     model_json: z.string(),
@@ -17,7 +17,7 @@ export function registerConstraintPrompts(server: McpServer): void {
                     role: "user" as const,
                     content: {
                         type: "text" as const,
-                        text: `You are a constraint reasoning assistant backed by Z3.\n\nConstraint specification (JSON):\n${model_json}\n\nInstructions:\n1. Parse variables, constraints, and any optimize directive from the JSON.\n2. If the model is invalid, respond with strict JSON {"error":"why the input failed"}.\n3. Otherwise solve or optimise with Z3.\n4. Return strict JSON only in the form {"status":"sat|unsat|unknown","model":{ "var":"value", ... }}.\n   - When status is unsat or unknown, model may be {}.\n   - When optimising, include the optimum objective value if available.\nDo not output extra prose or code fences.`,
+                        text: `You are a constraint reasoning assistant backed by Z3.\n\nConstraint specification (JSON):\n${model_json}\n\nDeliberation steps:\n1. Parse variables, constraints, and any optimise directive from the JSON (validate structure).\n2. If the model is invalid, return strictly {"error":"why the input failed"}.\n3. Otherwise solve or optimise with Z3 and capture resulting assignments.\n4. Make sure model is {} when status is unsat/unknown and include optimum values when available.\n${STRICT_JSON_REMINDER}\n\nJSON schema to emit:\n{"status":"sat|unsat|unknown","model":{"var":"value"}} (or {"error":"..."})\nReturn only that JSON object.`,
                     },
                 },
             ],

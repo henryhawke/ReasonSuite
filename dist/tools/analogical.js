@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { textResult } from "../lib/mcp.js";
+import { STRICT_JSON_REMINDER } from "../lib/prompt.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 const InputSchema = z.object({
     source_domain: z.string(),
@@ -31,14 +32,23 @@ SOURCE: ${source_domain}
 TARGET: ${target_problem}
 CONSTRAINTS: ${constraints ?? ""}
 
-JSON only:
+Deliberation steps:
+1. Identify the core actors, relationships, and dynamics in the source domain.
+2. Map each relevant source element to the best target counterpart with justification.
+3. List structural relations that transfer cleanly and flag mismatches or missing components.
+4. Summarise transferable_insights and failure_modes the target should monitor.
+
+${STRICT_JSON_REMINDER}
+
+JSON schema to emit:
 {
  "mapping":[{"source":"...","target":"...","justification":"..."}],
  "shared_relations":["..."],
  "mismatches":["..."],
  "transferable_insights":["..."],
  "failure_modes":["..."]
-}`;
+}
+Return only that JSON object.`;
         const { text } = await sampleStructuredJson({
             server,
             prompt,

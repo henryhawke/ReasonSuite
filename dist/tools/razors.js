@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { textResult } from "../lib/mcp.js";
+import { STRICT_JSON_REMINDER } from "../lib/prompt.js";
 import { DEFAULT_RAZORS, summarizeRazors } from "../lib/razors.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 const InputSchema = z.object({
@@ -28,11 +29,17 @@ export function registerRazors(server) {
 Razors to apply (explain how each affects the verdict):
 ${summarizeRazors(razors)}
 
-For each candidate produce JSON objects:
-{"id":"...","keep_or_drop":"keep|drop|revise","reasons":["..."],"risk_notes":"..."}
+Deliberation steps:
+1. Parse the candidate entries from candidates_json.
+2. For each candidate, apply every listed razor and capture keep/drop/revise with reasons.
+3. Highlight notable risks or caveats in risk_notes.
+4. Build a shortlist of the strongest candidates and add any meta notes.
 
-Return strict JSON only:
-{ "results": [...], "shortlist": ["ids..."], "notes": "..." }`;
+${STRICT_JSON_REMINDER}
+
+JSON schema to emit:
+{ "results": [{"id":"...","keep_or_drop":"keep|drop|revise","reasons":["..."],"risk_notes":"..."}], "shortlist": ["ids..."], "notes": "..." }
+Return only that JSON object.`;
         const { text } = await sampleStructuredJson({
             server,
             prompt,
