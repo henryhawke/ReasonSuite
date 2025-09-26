@@ -10,7 +10,7 @@ const InputSchema = z.object({
     razors: z.array(z.string()).default([...DEFAULT_RAZORS]),
 });
 
-const inputSchema = InputSchema as any;
+const inputSchema = InputSchema.shape;
 
 type InputArgs = z.output<typeof InputSchema>;
 type InputShape = typeof inputSchema;
@@ -77,19 +77,14 @@ Return only that JSON object.`;
             title: "Apply reasoning razors",
             description:
                 "Given candidate explanations, apply Occam/MDL, Bayesian Occam, Sagan, Hitchens, Hanlon, Popper falsifiability to produce keep/drop recommendations.",
-            inputSchema,
+            // inputSchema,
         },
         handler
     );
-    // snake_case alias for wider client compatibility
+    // Back-compat alias
     server.registerTool(
         "razors_apply",
-        {
-            title: "Apply reasoning razors",
-            description:
-                "Given candidate explanations, apply Occam/MDL, Bayesian Occam, Sagan, Hitchens, Hanlon, Popper falsifiability to produce keep/drop recommendations.",
-            inputSchema,
-        },
+        { title: "Apply reasoning razors (alias)", description: "Alias for razors.apply (back-compat)." },
         handler
     );
 }

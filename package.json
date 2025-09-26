@@ -14,11 +14,11 @@
         "@modelcontextprotocol/sdk": "^1.18.1",
         "yaml": "^2.8.1",
         "z3-solver": "^4.15.3",
-        "zod": "^4.1.11"
+        "zod": "^3.25.76"
     },
     "license": "Unlicense",
     "engines": {
-        "node": ">=18"
+        "node": ">=22"
     },
     "devDependencies": {
         "@types/node": "^24.5.2",

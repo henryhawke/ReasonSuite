@@ -9,7 +9,7 @@ const InputSchema = z.object({
     allow_citations: z.boolean().default(true),
 });
 
-const inputSchema = InputSchema as any;
+const inputSchema = InputSchema.shape;
 
 type InputArgs = z.output<typeof InputSchema>;
 type InputShape = typeof inputSchema;
@@ -68,8 +68,14 @@ Return only that JSON object.`;
         {
             title: "Transparent Self-Explanation",
             description: "Produce a rationale (chain-of-thought style summary), cite evidence, self-critique, and revise.",
-            inputSchema,
+            // inputSchema,
         },
+        handler
+    );
+    // Back-compat alias
+    server.registerTool(
+        "reasoning_self_explain",
+        { title: "Transparent Self-Explanation (alias)", description: "Alias for reasoning.self_explain (back-compat)." },
         handler
     );
 }

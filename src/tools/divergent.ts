@@ -10,7 +10,7 @@ const InputSchema = z.object({
     criteria: z.array(z.string()).default(["novelty", "consistency", "relevance"]),
 });
 
-const inputSchema = InputSchema as any;
+const inputSchema = InputSchema.shape;
 
 type InputArgs = z.output<typeof InputSchema>;
 type InputShape = typeof inputSchema;
@@ -82,9 +82,14 @@ Return only that JSON object.`;
     const config = {
         title: "Divergent–Convergent Creative",
         description: "Generate multiple options (divergent), then evaluate and converge with criteria (convergent).",
-        inputSchema,
+        // inputSchema,
     };
 
     server.registerTool("reasoning.divergent_convergent", config, handler);
-    server.registerTool("reasoning_divergent_convergent", config, handler);
+    // Back-compat alias
+    server.registerTool(
+        "reasoning_divergent_convergent",
+        { title: config.title, description: "Alias for reasoning.divergent_convergent (back-compat)." },
+        handler
+    );
 }

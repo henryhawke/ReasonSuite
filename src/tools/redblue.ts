@@ -10,7 +10,7 @@ const InputSchema = z.object({
     focus: z.array(z.string()).default(["safety", "bias", "hallucination", "security", "privacy"]),
 });
 
-const inputSchema = InputSchema as any;
+const inputSchema = InputSchema.shape;
 
 type InputArgs = z.output<typeof InputSchema>;
 type InputShape = typeof inputSchema;
@@ -101,10 +101,14 @@ Return only that JSON object.`;
         title: "Red vs Blue critique",
         description:
             "Run N rounds of adversarial challenge/defense on a proposal or answer. Returns a transcript + defects + risk matrix.",
-        inputSchema,
+        // inputSchema,
     };
 
     server.registerTool("redblue.challenge", config, handler);
-    server.registerTool("redblue_challenge", config, handler);
-    server.registerTool("redblue-challenge", config, handler);
+    // Back-compat alias
+    server.registerTool(
+        "redblue_challenge",
+        { title: config.title, description: "Alias for redblue.challenge (back-compat)." },
+        handler
+    );
 }

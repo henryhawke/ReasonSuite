@@ -10,7 +10,7 @@ const InputSchema = z.object({
     allow_tools: z.boolean().default(true),
 });
 
-const inputSchema = InputSchema as any;
+const inputSchema = InputSchema.shape;
 
 type InputArgs = z.output<typeof InputSchema>;
 type InputShape = typeof inputSchema;
@@ -79,10 +79,14 @@ Return only that JSON object.`;
     const config = {
         title: "Scientific Analytic Framework",
         description: "Decompose, hypothesize, test with tools, and verify (Popperian falsification).",
-        inputSchema,
+        // inputSchema,
     };
 
     server.registerTool("reasoning.scientific", config, handler);
-    server.registerTool("reasoning_scientific", config, handler);
-    server.registerTool("reasoning-scientific", config, handler);
+    // Back-compat alias
+    server.registerTool(
+        "reasoning_scientific",
+        { title: config.title, description: "Alias for reasoning.scientific (back-compat)." },
+        handler
+    );
 }

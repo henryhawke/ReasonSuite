@@ -22,7 +22,7 @@ const InputSchema = z
     })
     .passthrough();
 
-const inputSchema = InputSchema.shape as any;
+const inputSchema = InputSchema.shape;
 
 type InputArgs = z.output<typeof InputSchema>;
 

@@ -241,7 +241,8 @@ async function run() {
     context: "limited team capacity",
     audience: "exec",
   });
-  await call("dialectic_tas", { claim: "Adopt feature flags across services" });
+  // canonical only
+  await call("dialectic.tas", { claim: "Adopt feature flags across services" });
 
   // Socratic depths
   await call("socratic.inquire", {
@@ -259,7 +260,7 @@ async function run() {
     k: 2,
     apply_razors: ["MDL", "Popper"],
   });
-  await call("abductive_hypothesize", {
+  await call("abductive.hypothesize", {
     observations: "Latency spikes on Wednesdays",
     k: 10,
     apply_razors: [
@@ -283,7 +284,7 @@ async function run() {
     source_domain: "Assembly line QA",
     target_problem: "CI flaky tests",
   });
-  await call("analogical_map", {
+  await call("analogical.map", {
     source_domain: "Traffic control",
     target_problem: "API rate limiting",
     constraints: "prioritize ambulances == prioritize critical services",
@@ -294,7 +295,7 @@ async function run() {
     variables: ["Supply", "Demand", "Inventory"],
     context: "retail",
   });
-  await call("systems_map", { variables: [], context: "oncall handoffs" });
+  await call("systems.map", { variables: [], context: "oncall handoffs" });
 
   // Red/Blue (rounds & focus)
   await call("redblue.challenge", {
@@ -302,7 +303,7 @@ async function run() {
     rounds: 1,
     focus: ["safety", "rollback"],
   });
-  await call("redblue_challenge", {
+  await call("redblue.challenge", {
     proposal: "Expose admin API externally",
     rounds: 3,
     focus: ["security", "privacy", "abuse"],
@@ -314,7 +315,7 @@ async function run() {
     context: "small arrays",
     allow_tools: true,
   });
-  await call("reasoning_scientific", {
+  await call("reasoning.scientific", {
     goal: "Choose DB index",
     context: "point lookups",
     allow_tools: false,

@@ -10,7 +10,7 @@ const InputSchema = z.object({
     audience: z.string().default("general"),
 });
 
-const inputSchema = InputSchema as any;
+const inputSchema = InputSchema.shape;
 
 type InputArgs = z.output<typeof InputSchema>;
 type InputShape = typeof inputSchema;
@@ -82,9 +82,14 @@ Return only that JSON object.`;
     const config = {
         title: "Dialectic (Thesis–Antithesis–Synthesis)",
         description: "Given a claim, produce thesis, antithesis, and synthesis with evidence requests.",
-        inputSchema,
+        // inputSchema,
     };
 
     server.registerTool("dialectic.tas", config, handler);
-    server.registerTool("dialectic_tas", config, handler);
+    // Back-compat alias
+    server.registerTool(
+        "dialectic_tas",
+        { title: config.title, description: "Alias for dialectic.tas (back-compat)." },
+        handler
+    );
 }

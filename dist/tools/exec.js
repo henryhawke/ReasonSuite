@@ -7,7 +7,7 @@ const InputSchema = z.object({
         .describe("JavaScript source to run. If the user provided fenced code, pass the content between the fences."),
     timeout_ms: z.number().int().min(10).max(10_000).default(1500),
 });
-const inputSchema = InputSchema;
+const inputSchema = InputSchema.shape;
 function runInSandbox(code, timeoutMs) {
     const stdout = [];
     const stderr = [];
@@ -56,6 +56,8 @@ export function registerExec(server) {
     server.registerTool("exec.run", {
         title: "Run sandboxed JavaScript code",
         description: "Execute JavaScript code in a secure VM sandbox with a time limit. Captures print()/console.log output.",
-        inputSchema,
+        // inputSchema,
     }, handler);
+    // Back-compat alias
+    server.registerTool("exec_run", { title: "Run sandboxed JavaScript code (alias)", description: "Alias for exec.run (back-compat)." }, handler);
 }

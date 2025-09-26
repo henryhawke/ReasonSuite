@@ -137,17 +137,14 @@ export function registerConstraint(server: McpServer): void {
         {
             title: "Constraint solver (Z3)",
             description: "Solve constraints using Z3. Input mini-DSL as JSON (variables, constraints, optional optimize).",
-            inputSchema,
+            // inputSchema,
         },
         handler
     );
+    // Back-compat alias
     server.registerTool(
         "constraint_solve",
-        {
-            title: "Constraint solver (Z3)",
-            description: "Solve constraints using Z3. Input mini-DSL as JSON (variables, constraints, optional optimize).",
-            inputSchema,
-        },
+        { title: "Constraint solver (alias)", description: "Alias for constraint.solve (back-compat)." },
         handler
     );
 }

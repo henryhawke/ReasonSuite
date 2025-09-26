@@ -79,10 +79,14 @@ Return only that JSON object.`;
     const config = {
         title: "Socratic inquiry",
         description: "Generate a structured series of probing questions to clarify scope, assumptions, and evidence.",
-        inputSchema,
+        // inputSchema,
     } as const;
 
     server.registerTool("socratic.inquire", config, handler);
-    server.registerTool("socratic_inquire", config, handler);
-    server.registerTool("socratic-inquire", config, handler);
+    // Back-compat alias
+    server.registerTool(
+        "socratic_inquire",
+        { title: config.title, description: "Alias for socratic.inquire (back-compat)." },
+        handler
+    );
 }

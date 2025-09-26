@@ -7,7 +7,7 @@ const InputSchema = z.object({
     rounds: z.number().int().min(1).max(5).default(2),
     focus: z.array(z.string()).default(["safety", "bias", "hallucination", "security", "privacy"]),
 });
-const inputSchema = InputSchema;
+const inputSchema = InputSchema.shape;
 const OutputSchema = z
     .object({
     rounds: z
@@ -87,9 +87,9 @@ Return only that JSON object.`;
     const config = {
         title: "Red vs Blue critique",
         description: "Run N rounds of adversarial challenge/defense on a proposal or answer. Returns a transcript + defects + risk matrix.",
-        inputSchema,
+        // inputSchema,
     };
     server.registerTool("redblue.challenge", config, handler);
-    server.registerTool("redblue_challenge", config, handler);
-    server.registerTool("redblue-challenge", config, handler);
+    // Back-compat alias
+    server.registerTool("redblue_challenge", { title: config.title, description: "Alias for redblue.challenge (back-compat)." }, handler);
 }

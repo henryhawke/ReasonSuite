@@ -42,7 +42,7 @@ const InputSchema = z.object({
     maxSteps: z.number().int().positive().max(8).default(4),
 });
 
-const inputShape = InputSchema as any;
+const inputShape = InputSchema.shape;
 
 type InputArgs = z.output<typeof InputSchema>;
 type InputShape = typeof inputShape;
@@ -157,6 +157,17 @@ Return only that JSON object.`;
         },
         handler
     );
+    // Back-compat alias for environments that auto-map dots to underscores
+    server.registerTool(
+        "reasoning_router_plan",
+        {
+            title: "Plan reasoning approach",
+            description:
+                "Alias for reasoning.router.plan (back-compat).",
+            inputSchema: inputShape,
+        },
+        handler
+    );
 }
 
 function detectSignals(task: string, context: string | undefined): RouterSignals {
@@ -179,7 +190,7 @@ function detectSignals(task: string, context: string | undefined): RouterSignals
 }
 
 function summarizeSignals(signals: RouterSignals): string[] {
-    return (Object.entries(signals) as [keyof RouterSignals, boolean][]) 
+    return (Object.entries(signals) as [keyof RouterSignals, boolean][])
         .filter(([, active]) => active)
         .map(([key]) => SIGNAL_DESCRIPTIONS[key]);
 }

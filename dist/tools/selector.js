@@ -142,7 +142,6 @@ const InputSchema = z.object({
     candidate_modes: z.array(z.string()).default([...MODE_IDS]),
     candidate_razors: z.array(z.string()).default([...DEFAULT_RAZORS]),
 });
-// Use the full Zod schema for MCP tool input validation
 const inputSchema = InputSchema;
 const OutputSchema = z
     .object({
@@ -392,10 +391,13 @@ export function registerSelector(server) {
     const config = {
         title: "Select reasoning mode & razors",
         description: "Given a request, recommend the most useful reasoning mode and which Occam/Popper-style razors to apply next.",
-        inputSchema,
+        // inputSchema,
     };
     server.registerTool("reasoning.selector", config, handler);
-    // Provide underscore and dashed aliases for clients that use snake_case/kebab_case naming
-    server.registerTool("reasoning_selector", config, handler);
-    server.registerTool("reasoning-selector", config, handler);
+    // Back-compat alias for environments that auto-map dots to underscores
+    server.registerTool("reasoning_selector", {
+        title: config.title,
+        description: "Alias for reasoning.selector (back-compat).",
+        // inputSchema,
+    }, handler);
 }

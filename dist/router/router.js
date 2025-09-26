@@ -35,7 +35,7 @@ const InputSchema = z.object({
     context: z.string().optional(),
     maxSteps: z.number().int().positive().max(8).default(4),
 });
-const inputShape = InputSchema;
+const inputShape = InputSchema.shape;
 const SIGNAL_DESCRIPTIONS = {
     needsHypotheses: "Diagnosis / uncertainty cues detected → schedule abductive.hypothesize to explore explanations.",
     needsCreative: "Creative or brainstorming language detected → add reasoning.divergent_convergent for option generation.",
@@ -119,6 +119,12 @@ Return only that JSON object.`;
     server.registerTool("reasoning.router.plan", {
         title: "Plan reasoning approach",
         description: "Given a task, propose an ordered plan of reasoning modes with brief rationale. Modes include dialectic, socratic, abductive, systems, redblue, analogical, constraint, razors.apply, scientific, self_explain, divergent, exec.",
+        inputSchema: inputShape,
+    }, handler);
+    // Back-compat alias for environments that auto-map dots to underscores
+    server.registerTool("reasoning_router_plan", {
+        title: "Plan reasoning approach",
+        description: "Alias for reasoning.router.plan (back-compat).",
         inputSchema: inputShape,
     }, handler);
 }

@@ -110,10 +110,14 @@ Return only that JSON object.`;
         title: "Abductive hypotheses",
         description:
             "Generate k candidate hypotheses and rank by plausibility, explanatory power, simplicity (MDL proxy), and testability.",
-        inputSchema,
+        // inputSchema,
     };
 
     server.registerTool("abductive.hypothesize", config, handler);
-    server.registerTool("abductive_hypothesize", config, handler);
-    server.registerTool("abductive-hypothesize", config, handler);
+    // Back-compat alias
+    server.registerTool(
+        "abductive_hypothesize",
+        { title: config.title, description: "Alias for abductive.hypothesize (back-compat)." },
+        handler
+    );
 }

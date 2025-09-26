@@ -6,7 +6,7 @@ const InputSchema = z.object({
     query: z.string(),
     allow_citations: z.boolean().default(true),
 });
-const inputSchema = InputSchema;
+const inputSchema = InputSchema.shape;
 const OutputSchema = z
     .object({
     rationale: z.array(z.string()).default([]),
@@ -57,6 +57,8 @@ Return only that JSON object.`;
     server.registerTool("reasoning.self_explain", {
         title: "Transparent Self-Explanation",
         description: "Produce a rationale (chain-of-thought style summary), cite evidence, self-critique, and revise.",
-        inputSchema,
+        // inputSchema,
     }, handler);
+    // Back-compat alias
+    server.registerTool("reasoning_self_explain", { title: "Transparent Self-Explanation (alias)", description: "Alias for reasoning.self_explain (back-compat)." }, handler);
 }

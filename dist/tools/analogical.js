@@ -7,7 +7,7 @@ const InputSchema = z.object({
     target_problem: z.string(),
     constraints: z.string().optional(),
 });
-const inputSchema = InputSchema;
+const inputSchema = InputSchema.shape;
 const OutputSchema = z
     .object({
     mapping: z
@@ -73,9 +73,9 @@ Return only that JSON object.`;
     const config = {
         title: "Analogical mapping",
         description: "Map structure from a source domain to a target problem; identify correspondences, constraints, and transfer risks.",
-        inputSchema,
+        // inputSchema,
     };
     server.registerTool("analogical.map", config, handler);
-    server.registerTool("analogical_map", config, handler);
-    server.registerTool("analogical-map", config, handler);
+    // Back-compat alias
+    server.registerTool("analogical_map", { title: config.title, description: "Alias for analogical.map (back-compat)." }, handler);
 }

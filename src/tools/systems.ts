@@ -78,9 +78,14 @@ Return only that JSON object.`;
     const config = {
         title: "Systems map (CLD)",
         description: "Create a causal loop diagram (Mermaid) with candidate reinforcing/balancing loops and leverage points.",
-        inputSchema,
+        // inputSchema,
     };
 
     server.registerTool("systems.map", config, handler);
-    server.registerTool("systems_map", config, handler);
+    // Back-compat alias
+    server.registerTool(
+        "systems_map",
+        { title: config.title, description: "Alias for systems.map (back-compat)." },
+        handler
+    );
 }

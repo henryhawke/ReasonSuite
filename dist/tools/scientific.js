@@ -7,7 +7,7 @@ const InputSchema = z.object({
     context: z.string().optional(),
     allow_tools: z.boolean().default(true),
 });
-const inputSchema = InputSchema;
+const inputSchema = InputSchema.shape;
 const OutputSchema = z
     .object({
     decomposition: z.array(z.string()).default([]),
@@ -70,9 +70,9 @@ Return only that JSON object.`;
     const config = {
         title: "Scientific Analytic Framework",
         description: "Decompose, hypothesize, test with tools, and verify (Popperian falsification).",
-        inputSchema,
+        // inputSchema,
     };
     server.registerTool("reasoning.scientific", config, handler);
-    server.registerTool("reasoning_scientific", config, handler);
-    server.registerTool("reasoning-scientific", config, handler);
+    // Back-compat alias
+    server.registerTool("reasoning_scientific", { title: config.title, description: "Alias for reasoning.scientific (back-compat)." }, handler);
 }

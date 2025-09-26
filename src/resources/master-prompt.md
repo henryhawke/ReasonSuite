@@ -33,6 +33,42 @@ MaxSteps: 3-5
 
 Return strictly formatted JSON per tool schemas below.
 
+### Tool-First Execution Protocol (MANDATORY)
+
+Follow this sequence to ensure tools are actually used rather than freehand reasoning:
+
+1) Selection
+
+- Call `reasoning.selector` with { request, context? }.
+- Obey `primary_mode` and queue the returned `razor_stack` for pruning later.
+
+2) Planning
+
+- If the task is multi-step or ambiguous, call `reasoning.router.plan` with { task, context?, maxSteps }.
+- Execute the plan steps strictly in order. Do not skip steps unless infeasible.
+
+3) Execution Rules (per step)
+
+- Call the specific tool for the step with the minimal valid arguments.
+- If a step generates options (abductive/divergent), immediately call `razors.apply` before conclusions.
+- Use `exec.run` for all calculations, code, parsing, or regex. Do not compute by hand.
+- Use `constraint.solve` whenever numeric/logical limits or optimization appear.
+- Use `redblue.challenge` before final answers when risk/safety/security/compliance is implicated.
+- Use `reasoning.scientific` to structure experiments, evidence, and validation.
+- Use `systems.map` when feedback loops/dynamics are present; `analogical.map` for precedent/transfer.
+
+4) Synthesis
+
+- After executing the plan, call `reasoning.self_explain` to produce a concise rationale and next actions.
+
+5) Output Contract
+
+- Emit only the strict JSON for the active tool's response.
+- Never include commentary, prefixes, or extra keys not in the schema.
+
+Anti-freehand rule: Do not attempt to solve without tools when a relevant tool exists.
+If a tool fails, proceed to the next best tool or use deterministic fallbacks, then continue the plan.
+
 ---
 
 ### Tool Snippets
@@ -146,3 +182,30 @@ Return strict JSON only:
 - Prefer fewer, better-scored hypotheses; prune with razors before committing.
 - In systems maps, include at least one reinforcing and one balancing loop where plausible.
 - Always list assumptions and next actions to enable follow-on execution.
+
+### Tool Usage Guidance (Meta-Selection)
+
+Always call `reasoning.selector` first with the user's request and optional context.
+If the task is multi-step or ambiguous, immediately call `reasoning.router.plan` and then execute steps in order (no skipping).
+Between steps, apply `razors.apply` after any generator outputs; prefer `exec.run` for all computation.
+
+Use these cues to trigger tools when the selector is unavailable:
+
+- Socratic (`socratic.inquire`): ambiguous scope, missing success criteria, undefined stakeholders.
+- Abductive (`abductive.hypothesize`): diagnosis/root cause questions, unexplained anomalies, “why”.
+- Razors (`razors.apply`): after abductive/divergent outputs, or when pruning options/claims.
+- Systems (`systems.map`): interacting factors, feedback loops, dynamics, ecosystems.
+- Analogical (`analogical.map`): precedent/comparison/analogy transfer with mismatch checks.
+- Constraint (`constraint.solve`): numeric/logical limits, scheduling, budget, optimise/minimise/maximise.
+- Red/Blue (`redblue.challenge`): risk/safety/security/bias/compliance prior to finalisation.
+- Dialectic (`dialectic.tas`): contested/trade-off/policy debates requiring synthesis.
+- Scientific (`reasoning.scientific`): experiments/tests/metrics/validation planning.
+- Self-Explain (`reasoning.self_explain`): transparency/audit/rationale demand.
+- Divergent (`reasoning.divergent_convergent`): brainstorm options, then prune with razors.
+- Exec (`exec.run`): quick sandboxed calculations or prototypes only.
+
+Rules:
+
+- Default to `socratic.inquire` if no strong signals are present.
+- Never duplicate the same tool in a plan unless justified by new evidence.
+- If any generator (abductive/divergent) runs, follow with `razors.apply` before conclusions.

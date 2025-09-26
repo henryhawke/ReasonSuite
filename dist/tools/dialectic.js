@@ -7,7 +7,7 @@ const InputSchema = z.object({
     context: z.string().optional(),
     audience: z.string().default("general"),
 });
-const inputSchema = InputSchema;
+const inputSchema = InputSchema.shape;
 const OutputSchema = z
     .object({
     thesis: z.object({ position: z.string(), key_points: z.array(z.string()).default([]) }),
@@ -73,8 +73,9 @@ Return only that JSON object.`;
     const config = {
         title: "Dialectic (Thesis–Antithesis–Synthesis)",
         description: "Given a claim, produce thesis, antithesis, and synthesis with evidence requests.",
-        inputSchema,
+        // inputSchema,
     };
     server.registerTool("dialectic.tas", config, handler);
-    server.registerTool("dialectic_tas", config, handler);
+    // Back-compat alias
+    server.registerTool("dialectic_tas", { title: config.title, description: "Alias for dialectic.tas (back-compat)." }, handler);
 }
