@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { directLLMSample } from "./llm.js";
 
 type FallbackValue<T> = T | (() => T);
 
@@ -82,22 +83,52 @@ export async function sampleStructuredJson<T>({ server, prompt, maxTokens, schem
     const warnings: string[] = [];
     let raw = "";
 
-    try {
-        const response = await server.server.createMessage({
-            messages: [{ role: "user", content: { type: "text", text: prompt } }],
-            maxTokens,
-        });
-        const content: any = (response as any)?.content;
-        if (content && typeof content?.text === "string") {
-            raw = content.text;
-        } else if (Array.isArray(content)) {
-            const textPart = content.find((part: any) => typeof part?.text === "string");
-            raw = textPart?.text ?? "";
+    const hasMcpSampler = typeof (server as any)?.server?.createMessage === "function";
+    if (hasMcpSampler) {
+        const clientCapabilities =
+            typeof (server as any)?.server?.getClientCapabilities === "function"
+                ? (server as any).server.getClientCapabilities()
+                : undefined;
+        if (clientCapabilities && !clientCapabilities.sampling) {
+            warnings.push("Connected MCP client does not advertise sampling support.");
         } else {
-            warnings.push("LLM response did not include text content.");
+            try {
+                const response = await server.server.createMessage({
+                    messages: [{ role: "user", content: { type: "text", text: prompt } }],
+                    maxTokens,
+                });
+                const content: any = (response as any)?.content;
+                if (content && typeof content?.text === "string") {
+                    raw = content.text;
+                } else if (Array.isArray(content)) {
+                    const textPart = content.find((part: any) => typeof part?.text === "string");
+                    raw = textPart?.text ?? "";
+                } else {
+                    warnings.push("LLM response did not include text content.");
+                }
+            } catch (err: any) {
+                const message = err?.message ?? String(err);
+                if (typeof message === "string" && message.includes("MCP servers cannot make LLM calls")) {
+                    warnings.push("MCP host rejected sampling requests from this server; attempting direct fallback.");
+                } else {
+                    warnings.push(`LLM sampling failed: ${message}`);
+                }
+            }
         }
-    } catch (err: any) {
-        warnings.push(`LLM sampling failed: ${err?.message ?? String(err)}`);
+    } else {
+        warnings.push("MCP host sampling is unavailable (no createMessage implementation).");
+    }
+
+    if (!raw.trim()) {
+        const direct = await directLLMSample(prompt, maxTokens);
+        if (direct) {
+            if (direct.success) {
+                raw = direct.raw;
+                warnings.push(...direct.warnings);
+            } else {
+                warnings.push(`Direct LLM fallback failed: ${direct.reason}`);
+            }
+        }
     }
 
     const candidates = buildCandidates(raw);
