@@ -77,7 +77,7 @@ Return only that JSON object.`;
             title: "Apply reasoning razors",
             description:
                 "Given candidate explanations, apply Occam/MDL, Bayesian Occam, Sagan, Hitchens, Hanlon, Popper falsifiability to produce keep/drop recommendations.",
-            // inputSchema,
+            inputSchema: inputSchema,
         },
         handler
     );

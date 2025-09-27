@@ -11,7 +11,7 @@ const InputSchema = z.object({
     apply_razors: z.array(z.string()).default([...DEFAULT_RAZORS]),
 });
 
-const inputSchema = InputSchema as any;
+const inputSchema = InputSchema.shape;
 
 type InputArgs = z.output<typeof InputSchema>;
 type InputShape = typeof inputSchema;
@@ -110,7 +110,7 @@ Return only that JSON object.`;
         title: "Abductive hypotheses",
         description:
             "Generate k candidate hypotheses and rank by plausibility, explanatory power, simplicity (MDL proxy), and testability.",
-        // inputSchema,
+        inputSchema: inputSchema,
     };
 
     server.registerTool("abductive.hypothesize", config, handler);

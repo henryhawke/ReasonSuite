@@ -77,7 +77,7 @@ export function registerExec(server: McpServer): void {
             title: "Run sandboxed JavaScript code",
             description:
                 "Execute JavaScript code in a secure VM sandbox with a time limit. Captures print()/console.log output.",
-            // inputSchema,
+            inputSchema: inputSchema,
         },
         handler
     );

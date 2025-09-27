@@ -6,7 +6,7 @@ const InputSchema = z.object({
     variables: z.array(z.string()).describe("Known variables").default([]),
     context: z.string().optional(),
 });
-const inputSchema = InputSchema;
+const inputSchema = InputSchema.shape;
 const OutputSchema = z
     .object({
     mermaid: z.string(),
@@ -69,7 +69,7 @@ Return only that JSON object.`;
     const config = {
         title: "Systems map (CLD)",
         description: "Create a causal loop diagram (Mermaid) with candidate reinforcing/balancing loops and leverage points.",
-        // inputSchema,
+        inputSchema: inputSchema,
     };
     server.registerTool("systems.map", config, handler);
     // Back-compat alias

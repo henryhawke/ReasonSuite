@@ -12,7 +12,7 @@ const InputSchema = z.object({
     model_json: z.string().describe("JSON with {variables, constraints, optimize?}"),
 });
 
-const inputSchema = InputSchema as any;
+const inputSchema = InputSchema.shape;
 
 type InputArgs = z.output<typeof InputSchema>;
 type InputShape = typeof inputSchema;
@@ -137,7 +137,7 @@ export function registerConstraint(server: McpServer): void {
         {
             title: "Constraint solver (Z3)",
             description: "Solve constraints using Z3. Input mini-DSL as JSON (variables, constraints, optional optimize).",
-            // inputSchema,
+            inputSchema: inputSchema,
         },
         handler
     );

@@ -73,7 +73,7 @@ Return only that JSON object.`;
     const config = {
         title: "Dialectic (Thesis–Antithesis–Synthesis)",
         description: "Given a claim, produce thesis, antithesis, and synthesis with evidence requests.",
-        // inputSchema,
+        inputSchema: inputSchema,
     };
     server.registerTool("dialectic.tas", config, handler);
     // Back-compat alias

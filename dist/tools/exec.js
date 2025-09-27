@@ -56,7 +56,7 @@ export function registerExec(server) {
     server.registerTool("exec.run", {
         title: "Run sandboxed JavaScript code",
         description: "Execute JavaScript code in a secure VM sandbox with a time limit. Captures print()/console.log output.",
-        // inputSchema,
+        inputSchema: inputSchema,
     }, handler);
     // Back-compat alias
     server.registerTool("exec_run", { title: "Run sandboxed JavaScript code (alias)", description: "Alias for exec.run (back-compat)." }, handler);

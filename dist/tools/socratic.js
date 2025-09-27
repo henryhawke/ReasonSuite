@@ -7,7 +7,7 @@ const InputSchema = z.object({
     context: z.string().optional(),
     depth: z.number().int().min(1).max(6).default(3),
 });
-const inputSchema = InputSchema;
+const inputSchema = InputSchema.shape;
 const OutputSchema = z
     .object({
     layers: z.array(z.object({ level: z.number().int(), questions: z.array(z.string()).default([]) })).default([]),
@@ -69,7 +69,7 @@ Return only that JSON object.`;
     const config = {
         title: "Socratic inquiry",
         description: "Generate a structured series of probing questions to clarify scope, assumptions, and evidence.",
-        // inputSchema,
+        inputSchema: inputSchema,
     };
     server.registerTool("socratic.inquire", config, handler);
     // Back-compat alias

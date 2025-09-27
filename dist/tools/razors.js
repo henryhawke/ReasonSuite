@@ -63,7 +63,7 @@ Return only that JSON object.`;
     server.registerTool("razors.apply", {
         title: "Apply reasoning razors",
         description: "Given candidate explanations, apply Occam/MDL, Bayesian Occam, Sagan, Hitchens, Hanlon, Popper falsifiability to produce keep/drop recommendations.",
-        // inputSchema,
+        inputSchema: inputSchema,
     }, handler);
     // Back-compat alias
     server.registerTool("razors_apply", { title: "Apply reasoning razors (alias)", description: "Alias for razors.apply (back-compat)." }, handler);

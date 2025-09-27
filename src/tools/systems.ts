@@ -9,7 +9,7 @@ const InputSchema = z.object({
     context: z.string().optional(),
 });
 
-const inputSchema = InputSchema as any;
+const inputSchema = InputSchema.shape;
 
 type InputArgs = z.output<typeof InputSchema>;
 type InputShape = typeof inputSchema;
@@ -78,7 +78,7 @@ Return only that JSON object.`;
     const config = {
         title: "Systems map (CLD)",
         description: "Create a causal loop diagram (Mermaid) with candidate reinforcing/balancing loops and leverage points.",
-        // inputSchema,
+        inputSchema: inputSchema,
     };
 
     server.registerTool("systems.map", config, handler);

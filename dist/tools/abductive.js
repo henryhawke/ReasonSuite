@@ -8,7 +8,7 @@ const InputSchema = z.object({
     k: z.number().int().min(2).max(10).default(4),
     apply_razors: z.array(z.string()).default([...DEFAULT_RAZORS]),
 });
-const inputSchema = InputSchema;
+const inputSchema = InputSchema.shape;
 const OutputSchema = z
     .object({
     hypotheses: z
@@ -96,7 +96,7 @@ Return only that JSON object.`;
     const config = {
         title: "Abductive hypotheses",
         description: "Generate k candidate hypotheses and rank by plausibility, explanatory power, simplicity (MDL proxy), and testability.",
-        // inputSchema,
+        inputSchema: inputSchema,
     };
     server.registerTool("abductive.hypothesize", config, handler);
     // Back-compat alias

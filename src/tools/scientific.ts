@@ -79,7 +79,7 @@ Return only that JSON object.`;
     const config = {
         title: "Scientific Analytic Framework",
         description: "Decompose, hypothesize, test with tools, and verify (Popperian falsification).",
-        // inputSchema,
+        inputSchema: inputSchema,
     };
 
     server.registerTool("reasoning.scientific", config, handler);

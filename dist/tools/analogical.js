@@ -73,7 +73,7 @@ Return only that JSON object.`;
     const config = {
         title: "Analogical mapping",
         description: "Map structure from a source domain to a target problem; identify correspondences, constraints, and transfer risks.",
-        // inputSchema,
+        inputSchema: inputSchema,
     };
     server.registerTool("analogical.map", config, handler);
     // Back-compat alias

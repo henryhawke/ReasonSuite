@@ -167,7 +167,7 @@ const InputSchema = z.object({
     candidate_razors: z.array(z.string()).default([...DEFAULT_RAZORS]),
 });
 
-const inputSchema = InputSchema as any;
+const inputSchema = InputSchema.shape;
 
 type InputArgs = z.output<typeof InputSchema>;
 type InputShape = typeof inputSchema;
@@ -555,7 +555,7 @@ export function registerSelector(server: McpServer): void {
         title: "Select reasoning mode & razors",
         description:
             "Given a request, recommend the most useful reasoning mode and which Occam/Popper-style razors to apply next.",
-        // inputSchema,
+        inputSchema: inputSchema,
     } as const;
 
     server.registerTool("reasoning.selector", config, handler);
@@ -565,7 +565,7 @@ export function registerSelector(server: McpServer): void {
         {
             title: config.title,
             description: "Alias for reasoning.selector (back-compat).",
-            // inputSchema,
+            inputSchema: inputSchema,
         },
         handler
     );

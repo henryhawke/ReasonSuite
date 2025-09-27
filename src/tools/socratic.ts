@@ -10,7 +10,7 @@ const InputSchema = z.object({
     depth: z.number().int().min(1).max(6).default(3),
 });
 
-const inputSchema = InputSchema as any;
+const inputSchema = InputSchema.shape;
 
 type InputArgs = z.output<typeof InputSchema>;
 type InputShape = typeof inputSchema;
@@ -79,7 +79,7 @@ Return only that JSON object.`;
     const config = {
         title: "Socratic inquiry",
         description: "Generate a structured series of probing questions to clarify scope, assumptions, and evidence.",
-        // inputSchema,
+        inputSchema: inputSchema,
     } as const;
 
     server.registerTool("socratic.inquire", config, handler);

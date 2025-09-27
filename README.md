@@ -6,7 +6,7 @@ This repo is a Model Context Protocol (MCP) server that bundles a planning route
 
 ## Highlights
 
-- **Router-led planning.** The `reasoning.router.plan` tool picks a sequence of reasoning modes (dialectic, Socratic, abductive, systems, red/blue, analogical, constraint, razors) with arguments and rationale, falling back to a deterministic plan if sampling is unavailable.
+- **Router-led planning.** The `reasoning.router.plan` tool picks a sequence of reasoning modes (dialectic, Socratic, abductive, systems, red/blue, analogical, constraint, razors) with arguments and rationale using deterministic heuristics.
 - **Comprehensive reasoning tools.** Dialectic, Socratic, abductive, systems thinking, red/blue challenge, analogical mapping, constraint solving, divergent/convergent synthesis, self-explanation, and the exec sandbox are all exposed as MCP tools that return strict JSON payloads.
 - **Meta selection helper.** A prompt-agnostic `reasoning.selector` tool inspects any request and recommends the next reasoning mode plus the most relevant Occam/Popper-style razors.
 - **Occam & falsifiability razors.** A dedicated `razors.apply` tool scores candidate explanations using MDL/Occam, Bayesian Occam, Sagan, Hitchens, Hanlon, and Popper heuristics.
@@ -152,9 +152,11 @@ Then point your MCP client at `http://localhost:3333` if required by the client.
 
 ## Available tools
 
+All tools use deterministic heuristics and return structured JSON with `"source": "fallback"` in metadata - this is expected behavior.
+
 | Tool ID                 | Description                                                                                                         |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `reasoning.router.plan` | Plan a sequence of reasoning modes with arguments and rationale, with a safe fallback when sampling is unavailable. |
+| `reasoning.router.plan` | Plan a sequence of reasoning modes with arguments and rationale using deterministic heuristics.                   |
 | `reasoning.selector`    | Recommend the most suitable reasoning mode plus supporting razors for a given request.                              |
 | `dialectic.tas`         | Produce thesis, antithesis, synthesis, and open questions for a claim.                                              |
 | `socratic.inquire`      | Generate multi-layer Socratic question trees plus assumptions, evidence, and next actions.                          |
@@ -164,6 +166,30 @@ Then point your MCP client at `http://localhost:3333` if required by the client.
 | `redblue.challenge`     | Run adversarial red-team vs. blue-team critiques with transcripts, defects, and risk matrix.                        |
 | `analogical.map`        | Map structural analogies between domains, surfacing correspondences and transfer risks.                             |
 | `constraint.solve`      | Solve or optimize constraint problems expressed in the JSON mini-DSL and return Z3 models.                          |
+| `exec.run`              | Execute JavaScript code in a secure VM sandbox with timeout limits.                                                |
+
+### Tool Selection Guidelines
+
+**Start with planning:**
+- Use `reasoning.router.plan` for multi-step problems requiring several reasoning modes
+- Use `reasoning.selector` for quick single-tool selection based on problem characteristics
+
+**Core reasoning patterns:**
+- **Clarification**: `socratic.inquire` → explore assumptions, scope, evidence requirements
+- **Hypothesis generation**: `abductive.hypothesize` → generate explanations for uncertain situations
+- **Option evaluation**: `razors.apply` → filter ideas using logical heuristics (always use after hypothesis generation)
+- **Systems analysis**: `systems.map` → model feedback loops and leverage points
+- **Risk assessment**: `redblue.challenge` → adversarial testing for safety/security concerns
+- **Analogical reasoning**: `analogical.map` → transfer insights from similar domains
+- **Debate analysis**: `dialectic.tas` → examine opposing viewpoints and synthesis
+- **Optimization**: `constraint.solve` → solve constraint satisfaction and optimization problems
+- **Computation**: `exec.run` → calculations, data processing, quick prototypes
+
+**Typical workflows:**
+1. **Diagnostic**: `socratic.inquire` → `abductive.hypothesize` → `razors.apply`
+2. **Decision-making**: `reasoning.router.plan` → multiple tools → `redblue.challenge`
+3. **Systems thinking**: `socratic.inquire` → `systems.map` → `constraint.solve`
+4. **Creative problem-solving**: `reasoning.divergent_convergent` → `razors.apply` → validation tools
 
 ## Instructional prompt (copy/paste for LLMs)
 
@@ -174,7 +200,8 @@ You are connected to an MCP server named "reasonsuite" that exposes structured r
 
 Mission-critical habits:
 - Every tool returns strict JSON. Do not wrap results in Markdown fences or invent fields.
-- Inspect the `meta` warnings each tool returns; if a fallback fired, rerun or adjust the plan.
+- All tools use deterministic fallbacks (not LLM calls) and return `"source": "fallback"` in meta. This is expected behavior.
+- Inspect the `meta` warnings each tool returns for guidance on input validation or processing issues.
 - Keep your final reply concise: a short summary referencing the JSON artifacts, then the artifacts themselves.
 
 Default operating cadence:

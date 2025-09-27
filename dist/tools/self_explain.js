@@ -57,7 +57,7 @@ Return only that JSON object.`;
     server.registerTool("reasoning.self_explain", {
         title: "Transparent Self-Explanation",
         description: "Produce a rationale (chain-of-thought style summary), cite evidence, self-critique, and revise.",
-        // inputSchema,
+        inputSchema: inputSchema,
     }, handler);
     // Back-compat alias
     server.registerTool("reasoning_self_explain", { title: "Transparent Self-Explanation (alias)", description: "Alias for reasoning.self_explain (back-compat)." }, handler);

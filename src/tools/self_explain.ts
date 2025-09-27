@@ -68,7 +68,7 @@ Return only that JSON object.`;
         {
             title: "Transparent Self-Explanation",
             description: "Produce a rationale (chain-of-thought style summary), cite evidence, self-critique, and revise.",
-            // inputSchema,
+            inputSchema: inputSchema,
         },
         handler
     );

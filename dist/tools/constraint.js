@@ -5,7 +5,7 @@ import { init } from "z3-solver";
 const InputSchema = z.object({
     model_json: z.string().describe("JSON with {variables, constraints, optimize?}"),
 });
-const inputSchema = InputSchema;
+const inputSchema = InputSchema.shape;
 const SIMPLE_COMPARISON = /^([A-Za-z_][A-Za-z0-9_]*)\s*(<=|>=|==|=|!=|>|<)\s*([-+]?[A-Za-z0-9_\.]+)$/;
 function toSmtConstraint(raw) {
     const trimmed = raw.trim();
@@ -112,7 +112,7 @@ export function registerConstraint(server) {
     server.registerTool("constraint.solve", {
         title: "Constraint solver (Z3)",
         description: "Solve constraints using Z3. Input mini-DSL as JSON (variables, constraints, optional optimize).",
-        // inputSchema,
+        inputSchema: inputSchema,
     }, handler);
     // Back-compat alias
     server.registerTool("constraint_solve", { title: "Constraint solver (alias)", description: "Alias for constraint.solve (back-compat)." }, handler);

@@ -142,7 +142,7 @@ const InputSchema = z.object({
     candidate_modes: z.array(z.string()).default([...MODE_IDS]),
     candidate_razors: z.array(z.string()).default([...DEFAULT_RAZORS]),
 });
-const inputSchema = InputSchema;
+const inputSchema = InputSchema.shape;
 const OutputSchema = z
     .object({
     primary_mode: z.object({
@@ -391,13 +391,13 @@ export function registerSelector(server) {
     const config = {
         title: "Select reasoning mode & razors",
         description: "Given a request, recommend the most useful reasoning mode and which Occam/Popper-style razors to apply next.",
-        // inputSchema,
+        inputSchema: inputSchema,
     };
     server.registerTool("reasoning.selector", config, handler);
     // Back-compat alias for environments that auto-map dots to underscores
     server.registerTool("reasoning_selector", {
         title: config.title,
         description: "Alias for reasoning.selector (back-compat).",
-        // inputSchema,
+        inputSchema: inputSchema,
     }, handler);
 }

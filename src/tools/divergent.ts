@@ -82,7 +82,7 @@ Return only that JSON object.`;
     const config = {
         title: "Divergent–Convergent Creative",
         description: "Generate multiple options (divergent), then evaluate and converge with criteria (convergent).",
-        // inputSchema,
+        inputSchema: inputSchema,
     };
 
     server.registerTool("reasoning.divergent_convergent", config, handler);
