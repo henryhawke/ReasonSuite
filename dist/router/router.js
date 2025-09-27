@@ -19,7 +19,10 @@ const ModeSchema = z.enum([
     "exec",
 ]);
 const StepSchema = z.object({
-    mode: ModeSchema,
+    mode: z
+        .union([ModeSchema, z.literal("razors")])
+        .transform((value) => (value === "razors" ? "razors.apply" : value))
+        .pipe(ModeSchema),
     tool: z.string().optional(),
     why: z.string(),
     args: z.record(z.string(), z.unknown()).default({}),
@@ -71,7 +74,7 @@ export function registerRouter(server) {
             "reasoning.divergent_convergent — brainstorm options then converge with scoring",
             "exec.run — execute sandboxed JavaScript for quick calculations or prototypes",
         ].join("\n");
-        const prompt = `You are a planning assistant that selects reasoning tools for an autonomous analyst.
+        const prompt = `You are a planner and planning assistant that selects reasoning tools for an autonomous analyst.
 
 Mode quick reference (tool → cue):
 ${modeReference}
