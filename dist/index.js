@@ -1,9 +1,11 @@
+#!/usr/bin/env node
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import fs from "node:fs/promises";
 import { createServer } from "node:http";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 // Tools
 import { registerDialectic } from "./tools/dialectic.js";
 import { registerSocratic } from "./tools/socratic.js";
@@ -30,7 +32,8 @@ import { registerConstraintPrompts } from "./prompts/constraint.js";
 import { registerScientificPrompts } from "./prompts/scientific.js";
 import { registerSelfExplainPrompts } from "./prompts/self_explain.js";
 import { registerDivergentPrompts } from "./prompts/divergent.js";
-const server = new McpServer({ name: "reasonsuite", version: "1.0.0" });
+const pkgJson = JSON.parse(await fs.readFile(new URL("../package.json", import.meta.url), "utf-8"));
+const server = new McpServer({ name: pkgJson.name ?? "reasonsuite", version: pkgJson.version ?? "0.0.0" });
 // Register tools
 registerRouter(server);
 registerRazors(server);
@@ -57,8 +60,27 @@ registerConstraintPrompts(server);
 registerScientificPrompts(server);
 registerSelfExplainPrompts(server);
 registerDivergentPrompts(server);
+const moduleDir = fileURLToPath(new URL(".", import.meta.url));
+async function resolveResourcePath(file) {
+    const candidates = [
+        path.resolve(moduleDir, "resources", file),
+        path.resolve(moduleDir, "../resources", file),
+        path.resolve(moduleDir, "../src/resources", file),
+        path.resolve(process.cwd(), "src/resources", file),
+    ];
+    for (const candidate of candidates) {
+        try {
+            await fs.access(candidate);
+            return candidate;
+        }
+        catch {
+            // Continue trying other candidates
+        }
+    }
+    throw new Error(`Resource file not found: ${file}`);
+}
 async function addResource(file, title, description) {
-    const p = path.resolve(process.cwd(), "src/resources", file);
+    const p = await resolveResourcePath(file);
     server.registerResource(file, `doc://${file}`, { title, description, mimeType: "text/markdown" }, async (uri) => ({ contents: [{ uri: uri.href, text: await fs.readFile(p, "utf-8") }] }));
 }
 await addResource("razors.md", "Reasoning Razors", "Occam/MDL, Bayesian Occam, Sagan, Hitchens, Hanlon, Popper");

@@ -3,7 +3,7 @@
     "version": "1.0.1",
     "type": "module",
     "bin": {
-        "reasonsuite": "bin/reasonsuite"
+        "reasonsuite": "dist/index.js"
     },
     "scripts": {
         "build": "tsc -p tsconfig.json",
