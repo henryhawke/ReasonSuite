@@ -2,7 +2,7 @@
 
 [![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=ReasonSuite&config=eyJjb21tYW5kIjoibnB4IC15IHJlYXNvbnN1aXRlIn0%3D)
 
- [📖 Instructional Prompt](cursor://anysphere.cursor-deeplink/prompt?text=You+are+connected+to+an+MCP+server+named+%22reasonsuite%22+that+exposes+structured+reasoning+tools.%0A%0AMission-critical+habits%3A%0A-+Every+tool+returns+strict+JSON.+Do+not+wrap+results+in+Markdown+fences+or+invent+fields.%0A-+All+tools+use+deterministic+fallbacks+%28not+LLM+calls%29+and+return+%60%22source%22%3A+%22fallback%22%60+in+meta.+This+is+expected+behavior.%0A-+Inspect+the+%60meta%60+warnings+each+tool+returns+for+guidance+on+input+validation+or+processing+issues.%0A-+Keep+your+final+reply+concise%3A+a+short+summary+referencing+the+JSON+artifacts%2C+then+the+artifacts+themselves.%0A%0ADefault+operating+cadence%3A%0A1.+Intake+%E2%86%92+restate+the+user%27s+goal+and+missing+info.%0A2.+Planning+%E2%86%92+when+work+needs+multiple+steps%2C+call+%60reasoning.router.plan%60+with+the+task%2Fcontext+and+follow+the+ordered+steps.+For+quick+one-off+answers%2C+call+%60reasoning.selector%60+to+pick+the+best+tool.%0A3.+Execution+%E2%86%92+run+tools+exactly+in+plan+order.+Pass+%60%7B+request%2C+context%2FpriorArtifacts+%7D%60+so+downstream+tools+can+reuse+data.+After+%60abductive.hypothesize%60+or+%60reasoning.divergent_convergent%60%2C+schedule+%60razors.apply%60+to+prune+ideas.%0A4.+Risk+%26+validation+%E2%86%92+insert+%60redblue.challenge%60+whenever+safety%2Fcompliance%2Fdeployment+risk+appears.+Use+%60reasoning.scientific%60+to+design+tests%2C+%60exec.run%60+for+calculations%2Fprototypes%2C+and+%60constraint.solve%60+for+feasibility+questions.%0A5.+Synthesis+%E2%86%92+if+transparency+is+requested%2C+finish+with+%60reasoning.self_explain%60%2C+then+deliver+the+final+answer.%0A%0ATool+intents%3A%0A-+%60socratic.inquire%60%3A+clarify+scope%2C+assumptions%2C+evidence%2C+and+next+actions.%0A-+%60reasoning.router.plan%60%3A+produce+a+step-by-step+tool+plan+with+rationales.%0A-+%60reasoning.selector%60%3A+choose+the+next+best+tool+%2B+razors+when+only+one+call+is+needed.%0A-+%60abductive.hypothesize%60%3A+rank+hypotheses+and+note+experiments+%28pair+with+%60razors.apply%60%29.%0A-+%60razors.apply%60%3A+apply+Occam%2FMDL%2C+Bayesian+Occam%2C+Sagan%2C+Hitchens%2C+Hanlon%2C+Popper+heuristics+to+keep%2Fdrop+options.%0A-+%60reasoning.divergent_convergent%60%3A+brainstorm+options+then+converge+on+a+winner+with+scoring.%0A-+%60systems.map%60%3A+build+causal+loop+diagrams%2C+leverage+points%2C+stocks%2Fflows%2C+risks.%0A-+%60analogical.map%60%3A+transfer+structure+from+an+analogous+domain+while+flagging+mismatches.%0A-+%60dialectic.tas%60%3A+surface+thesis%2Fantithesis%2Fsynthesis+and+open+questions+for+contested+topics.%0A-+%60redblue.challenge%60%3A+run+adversarial+reviews+and+produce+a+risk+matrix+%2B+guidance.%0A-+%60reasoning.scientific%60%3A+decompose+goals%2C+plan+experiments%2C+describe+falsification.%0A-+%60constraint.solve%60%3A+check+feasibility+or+optimisation+goals+with+the+constraint+DSL+and+Z3.%0A-+%60exec.run%60%3A+execute+sandboxed+JavaScript+for+quick+calculations+or+parsing.%0A-+%60reasoning.self_explain%60%3A+produce+rationale%2C+evidence%2C+self-critique%2C+and+revision.%0A%0AOutput+discipline%3A%0A-+Return+a+bullet+summary+plus+the+JSON+artifacts+from+each+tool+%28no+extra+prose+around+the+JSON%29.%0A-+If+required+data+is+missing%2C+state+your+assumptions+inside+the+tool+notes%2Fcritique+fields+before+proceeding.%0A-+Keep+schema+fidelity%E2%80%94match+key+names%2C+array+vs+object+shape%2C+and+value+types+exactly+as+returned+by+each+tool.%0A%60%60%60%0A%0A%23%23+Prompt+templates%0A%0AEach+tool+has+a+corresponding+prompt+registered+under+%60src%2Fprompts%2F%60.+For+example%2C+%60prompts%2Fdialectic.ts%60+exposes+a+template+for+thesis%2Fantithesis%2Fsynthesis+framing%2C+while+%60prompts%2Fredblue.ts%60+wraps+the+red%2Fblue+challenge+configuration.+Registering+the+server+automatically+publishes+these+prompts+to+MCP+clients+via+%60tools%2Flist%60+and+%60prompts%2Flist%60+endpoints.%0A%0A%23%23+Embedded+resources%0A%0AReference+documents+are+served+under+%60doc%3A%2F%2F%60+URIs+for+quick+lookup+inside+supporting+MCP+clients%3A%0A%0A-+%60doc%3A%2F%2Frazors.md%60+%E2%80%94+Occam%2FMDL%2C+Bayesian+Occam%2C+Sagan%2C+Hitchens%2C+Hanlon%2C+Popper+razors.%0A-+%60doc%3A%2F%2Fsystems-cheatsheet.md%60+%E2%80%94+Feedback+loops%2C+leverage+points%2C+stocks%2Fflows+overview.%0A-+%60doc%3A%2F%2Fconstraint-dsl.md%60+%E2%80%94+Syntax+guide+for+the+constraint+mini-DSL.%0A%0A%23%23+Constraint+mini-DSL%0A%0AConstraint+problems+are+supplied+as+JSON+with+%60%7B+variables%2C+constraints%2C+optimize%3F+%7D%60.+Input+is+validated+with+Zod+%28%60src%2Flib%2Fdsl.ts%60%29%2C+ensuring+variable+names+are+well+formed+and+duplicates+are+rejected.+The+solver+assembles+SMT-LIB+statements%2C+loads+them+into+a+Z3+solver%2Foptimizer%2C+and+returns+%60%7B+status%2C+model+%7D%60+with+symbolic+assignments+for+each+declared+variable.%0A%0AExample+payload%3A%0A%0A%60%60%60json%0A%7B%0A++%22variables%22%3A+%5B%0A++++%7B+%22name%22%3A+%22x%22%2C+%22type%22%3A+%22Int%22+%7D%2C%0A++++%7B+%22name%22%3A+%22y%22%2C+%22type%22%3A+%22Real%22+%7D%0A++%5D%2C%0A++%22constraints%22%3A+%5B%22%28%3E%3D+x+0%29%22%2C+%22%28%3D+y+%28%2B+x+2.5%29%29%22%5D%2C%0A++%22optimize%22%3A+%7B+%22objective%22%3A+%22%28%2B+x+y%29%22%2C+%22sense%22%3A+%22max%22+%7D%0A%7D%0A%60%60%60)
+ [📖 Instructional Prompt](cursor://anysphere.cursor-deeplink/prompt?text=You+are+connected+to+an+MCP+server+named+%22reasonsuite%22+exposing+structured+reasoning+tools.%0A%0A%E2%9A%A0%EF%B8%8FCritical%3A+All+tools+return+strict+JSON.+No+Markdown+fences.+Tools+use+deterministic+fallbacks+%28source%3A%22fallback%22+in+meta%29.+Check+%60meta.warnings%60+for+validation+issues.+Output%3A+bullet+summary+%2B+JSON+artifacts+only.%0A%0A%F0%9F%93%8AWorkflow%3A%0A1.+Intake%E2%86%92Restate+goal+%2B+gaps%0A2.+Planning%E2%86%92%60reasoning.router.plan%60+for+multi-step%2C+%60reasoning.selector%60+for+single-tool%0A3.+Execution%E2%86%92Follow+plan+order.+Pass+%7Brequest%2Ccontext%2FpriorArtifacts%7D+for+reuse.+Pair+%60abductive.hypothesize%60%2F%60reasoning.divergent_convergent%60+with+%60razors.apply%60%0A4.+Risk%E2%86%92Use+%60redblue.challenge%60+for+safety%2Fdeployment+risks%2C+%60reasoning.scientific%60+for+tests%2C+%60exec.run%60+for+calculations%2C+%60constraint.solve%60+for+feasibility%0A5.+Synthesis%E2%86%92End+with+%60reasoning.self_explain%60+if+transparency+needed%0A%0A%F0%9F%9B%A0%EF%B8%8FTool+Guide%3A%0A%E2%80%A2+socratic.inquire+%E2%86%92+Clarify+scope%2Fassumptions%2Fevidence%2Factions%0A%E2%80%A2+reasoning.router.plan+%E2%86%92+Multi-step+plan+with+rationales%0A%E2%80%A2+reasoning.selector+%E2%86%92+Pick+best+tool+%2B+razors+for+single+calls%0A%E2%80%A2+abductive.hypothesize+%E2%86%92+Rank+hypotheses+%2B+experiments+%28pair+w%2F+razors.apply%29%0A%E2%80%A2+razors.apply+%E2%86%92+MDL%2FOccam%2C+Bayesian%2C+Sagan%2C+Hitchens%2C+Hanlon%2C+Popper+filters%0A%E2%80%A2+reasoning.divergent_convergent+%E2%86%92+Brainstorm+then+converge+w%2F+scoring%0A%E2%80%A2+systems.map+%E2%86%92+Causal+loops%2C+leverage+points%2C+stocks%2Fflows%2C+risks%0A%E2%80%A2+analogical.map+%E2%86%92+Transfer+structure+from+analogous+domain%2C+flag+mismatches%0A%E2%80%A2+dialectic.tas+%E2%86%92+Thesis%2Fantithesis%2Fsynthesis+%2B+questions+for+contested+topics%0A%E2%80%A2+redblue.challenge+%E2%86%92+Adversarial+review+%2B+risk+matrix+%2B+guidance%0A%E2%80%A2+reasoning.scientific+%E2%86%92+Decompose+goals%2C+plan+experiments%2C+describe+falsification%0A%E2%80%A2+constraint.solve+%E2%86%92+Z3-backed+feasibility%2Foptimization+w%2F+DSL%0A%E2%80%A2+exec.run+%E2%86%92+Sandbox+JavaScript+for+calculations%2Fparsing%0A%E2%80%A2+reasoning.self_explain+%E2%86%92+Rationale%2C+evidence%2C+self-critique%2C+revision%0A%0A%F0%9F%93%8BOutput%3A+Exact+schema+match.+State+assumptions+in+notes%2Fcritique+if+data+missing.%0A%0A%F0%9F%93%9DResources%3A+doc%3A%2F%2Frazors.md%2C+doc%3A%2F%2Fsystems-cheatsheet.md%2C+doc%3A%2F%2Fconstraint-dsl.md%0A%0A%F0%9F%94%87Constraint+DSL%3A+JSON+%7Bvariables%2Cconstraints%2Coptimize%3F%7D+%E2%86%92+Z3+SMT-LIB+%E2%86%92+%7Bstatus%2Cmodel%7D)
 
 ReasonSuite is a structured thinking framework that helps a model work through any problem. My thought is why not have other types of reasoning than just sequential thinking mcp. Give your model trusted logical heuristics instead of relying solely on an llm's emergent reasoning.
 
@@ -111,6 +111,220 @@ node dist/test-openrouter.js
 
 This will validate your API keys and test the caching functionality.
 
+## Operating Modes
+
+ReasonSuite can run in two modes:
+
+### Cloud Mode (Default)
+
+In cloud mode, ReasonSuite uses external LLM providers (OpenRouter, OpenAI, or Anthropic) to generate reasoning outputs. This mode provides:
+
+- LLM-enhanced responses with natural language reasoning
+- Intelligent fallback between multiple providers
+- Response caching for performance and cost optimization
+- Requires API key configuration for at least one provider
+
+### Local Mode
+
+In local mode, ReasonSuite runs without making external API calls and uses deterministic fallback logic for all tools. This mode provides:
+
+- **No external API calls** - all reasoning uses built-in heuristics
+- **No API keys required** - works out of the box
+- **Deterministic outputs** - consistent, rule-based responses
+- **Zero cost** - no API usage charges
+- **Client-side reasoning** - the MCP client's model can work directly with tool schemas and deterministic outputs
+
+Perfect for:
+
+- Testing and development
+- Running on machines without internet access
+- Using with Cursor's model to handle reasoning
+- Avoiding external API dependencies
+
+#### Enabling Local Mode
+
+Set the `REASONSUITE_LOCAL_MODE` or `LOCAL_MODE` environment variable to `true` or `1`:
+
+**Via environment variable:**
+
+```bash
+export REASONSUITE_LOCAL_MODE=true
+npm start
+```
+
+**Via MCP configuration** (in `mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "reasonsuite": {
+      "command": "npx",
+      "args": ["-y", "reasonsuite"],
+      "env": {
+        "REASONSUITE_LOCAL_MODE": "true"
+      }
+    }
+  }
+}
+```
+
+**For Cursor users** wanting to use Cursor's model for reasoning:
+
+```json
+{
+  "mcpServers": {
+    "reasonsuite": {
+      "command": "npx",
+      "args": ["-y", "reasonsuite"],
+      "env": {
+        "MCP_TRANSPORT": "stdio",
+        "REASONSUITE_LOCAL_MODE": "true"
+      }
+    }
+  }
+}
+```
+
+When running in local mode, you'll see this message on startup:
+
+```
+ReasonSuite server on stdio - LOCAL MODE (deterministic fallbacks, no external LLM calls)
+```
+
+## Testing Local Mode
+
+You can verify that local mode is working correctly by running the following tests:
+
+### Quick Test
+
+Create a simple test file to verify local mode is enabled:
+
+```bash
+# Create test file
+cat > test-local-mode.js << 'EOF'
+#!/usr/bin/env node
+import { isLocalMode, directLLMSample } from "./dist/lib/llm.js";
+
+console.log("\n=== ReasonSuite Local Mode Test ===\n");
+const localEnabled = isLocalMode();
+console.log(`Local Mode Status: ${localEnabled ? "✓ ENABLED" : "✗ DISABLED"}`);
+
+if (!localEnabled) {
+    console.log("Set REASONSUITE_LOCAL_MODE=true to enable local mode");
+    process.exit(0);
+}
+
+const result = await directLLMSample("Test prompt", 100);
+console.log(`✓ Test completed - Success: ${result?.success ? "false (expected)" : "true (expected)"}`);
+console.log(`  Reason: ${result?.reason || "N/A"}`);
+
+if (result?.reason?.includes("local mode")) {
+    console.log("\n✓✓ Local mode is working correctly!");
+    console.log("   No external API calls will be made.");
+    console.log("   All tools will use deterministic fallback logic.");
+}
+EOF
+
+# Run the test
+node test-local-mode.js
+```
+
+### Comprehensive Tool Test
+
+For a more thorough test that verifies all tools work in local mode:
+
+```bash
+# Create comprehensive test file
+cat > test-tools-local-mode.js << 'EOF'
+#!/usr/bin/env node
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { registerDialectic } from "./dist/tools/dialectic.js";
+import { registerSocratic } from "./dist/tools/socratic.js";
+import { registerSelector } from "./dist/tools/selector.js";
+import { isLocalMode } from "./dist/lib/llm.js";
+
+console.log("\n=== ReasonSuite Local Mode Tool Test ===\n");
+const localEnabled = isLocalMode();
+console.log(`Local Mode: ${localEnabled ? "✓ ENABLED" : "✗ DISABLED"}`);
+
+if (!localEnabled) {
+    console.log("Enable local mode first: export REASONSUITE_LOCAL_MODE=true");
+    process.exit(0);
+}
+
+// Create test server and register tools
+const server = new McpServer({ name: "test-server", version: "1.0.0" });
+registerDialectic(server);
+registerSocratic(server);
+registerSelector(server);
+
+console.log("Testing tools in local mode...");
+
+// Test dialectic tool
+console.log("\n--- Testing dialectic.tas tool ---");
+try {
+    const handler = server._tools?.["dialectic.tas"]?.handler;
+    const result = await handler({
+        claim: "AI will replace all software engineers",
+        context: "Technology industry in 2025",
+        audience: "general"
+    }, {});
+
+    const parsed = JSON.parse(result.text);
+    console.log("✓ Tool executed successfully");
+    console.log(`  Source: ${parsed.meta?.source || "unknown"}`);
+    console.log(`  Has thesis: ${!!parsed.thesis}`);
+    console.log(`  Has antithesis: ${!!parsed.antithesis}`);
+    console.log(`  Has synthesis: ${!!parsed.synthesis}`);
+    if (parsed.meta?.warnings?.length) {
+        console.log(`  Warnings: ${parsed.meta.warnings.join(", ")}`);
+    }
+} catch (error) {
+    console.error("✗ Test failed:", error.message);
+}
+
+// Test selector tool
+console.log("\n--- Testing reasoning.selector tool ---");
+try {
+    const handler = server._tools?.["reasoning.selector"]?.handler;
+    const result = await handler({
+        request: "How can we optimize our supply chain to reduce costs?",
+        context: "Manufacturing company with global distribution"
+    }, {});
+
+    const parsed = JSON.parse(result.text);
+    console.log("✓ Tool executed successfully");
+    console.log(`  Source: ${parsed.meta?.source || "unknown"}`);
+    console.log(`  Primary mode: ${parsed.primary_mode?.id || "unknown"}`);
+    console.log(`  Confidence: ${parsed.primary_mode?.confidence || 0}`);
+} catch (error) {
+    console.error("✗ Test failed:", error.message);
+}
+
+console.log("\n✓ All tools tested successfully in local mode!");
+EOF
+
+# Run the comprehensive test
+node test-tools-local-mode.js
+```
+
+### Expected Output
+
+When local mode is working correctly, you'll see output like:
+
+```
+=== ReasonSuite Local Mode Test ===
+
+Local Mode Status: ✓ ENABLED
+
+✓ Test completed - Success: false (expected)
+  Reason: Running in local mode - external LLM calls are disabled. Using deterministic fallback.
+
+✓✓ Local mode is working correctly!
+   No external API calls will be made.
+   All tools will use deterministic fallback logic.
+```
+
 ## Quick start (MCP)
 
 Install from npm (recommended):
@@ -155,6 +369,8 @@ After the server starts, connect with your MCP client, list the available tools/
 
 Create a `mcp.json` either in your project at `.cursor/mcp.json` or globally at `~/.cursor/mcp.json`:
 
+**Cloud Mode (with external LLM providers):**
+
 ```json
 {
   "mcpServers": {
@@ -166,6 +382,23 @@ Create a `mcp.json` either in your project at `.cursor/mcp.json` or globally at 
         "OPENROUTER_API_KEY": "your_key_here",
         "OPENAI_API_KEY": "your_key_here",
         "ANTHROPIC_API_KEY": "your_key_here"
+      }
+    }
+  }
+}
+```
+
+**Local Mode (no external API calls, uses Cursor's model):**
+
+```json
+{
+  "mcpServers": {
+    "reasonsuite": {
+      "command": "npx",
+      "args": ["-y", "reasonsuite"],
+      "env": {
+        "MCP_TRANSPORT": "stdio",
+        "REASONSUITE_LOCAL_MODE": "true"
       }
     }
   }

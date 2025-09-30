@@ -202,7 +202,18 @@ function setCacheResult(prompt, maxTokens, result) {
     const key = getCacheKey(prompt, maxTokens);
     responseCache.set(key, { result, timestamp: Date.now() });
 }
+export function isLocalMode() {
+    const localMode = readEnv("REASONSUITE_LOCAL_MODE") ?? readEnv("LOCAL_MODE");
+    return localMode === "true" || localMode === "1";
+}
 export async function directLLMSample(prompt, maxTokens) {
+    // Check if running in local mode (no external LLM calls)
+    if (isLocalMode()) {
+        return {
+            success: false,
+            reason: "Running in local mode - external LLM calls are disabled. Using deterministic fallback."
+        };
+    }
     // Check cache first
     const cachedResult = getCachedResult(prompt, maxTokens);
     if (cachedResult) {

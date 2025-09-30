@@ -61,21 +61,30 @@ function tryParse(candidate) {
 export async function sampleStructuredJson({ server, prompt, maxTokens, schema, fallback }) {
     const warnings = [];
     let raw = "";
-    // Try to use direct LLM sampling first
+    // Try to use direct LLM sampling first (unless in local mode)
     try {
         const llmResult = await directLLMSample(prompt, maxTokens);
         if (llmResult && llmResult.success) {
             raw = llmResult.raw;
         }
         else {
-            warnings.push("Direct LLM sampling failed; using deterministic fallback.");
+            const reason = llmResult?.reason ?? "Unknown error";
+            if (reason.includes("local mode")) {
+                warnings.push("Running in local mode - using deterministic fallback.");
+            }
+            else {
+                warnings.push(`Direct LLM sampling failed: ${reason}`);
+            }
         }
     }
     catch (err) {
         warnings.push(`Direct LLM sampling failed: ${err.message}`);
     }
     if (!raw.trim()) {
-        warnings.push("No response from LLM sampling; using deterministic fallback.");
+        // Don't add redundant warning if we already noted local mode
+        if (!warnings.some(w => w.includes("local mode"))) {
+            warnings.push("No response from LLM sampling; using deterministic fallback.");
+        }
     }
     const candidates = buildCandidates(raw);
     for (const candidate of candidates) {

@@ -87,6 +87,12 @@ await addResource("razors.md", "Reasoning Razors", "Occam/MDL, Bayesian Occam, S
 await addResource("systems-cheatsheet.md", "Systems Thinking Cheatsheet", "Causal loops, stocks/flows, leverage points");
 await addResource("constraint-dsl.md", "Constraint DSL", "Mini-DSL compiled to Z3");
 await addResource("master-prompt.md", "ReasonSuite Master Prompt", "Master prompt and tool snippets");
+// Check and log operational mode
+import { isLocalMode } from "./lib/llm.js";
+const localMode = isLocalMode();
+const modeDescription = localMode
+    ? "LOCAL MODE (deterministic fallbacks, no external LLM calls)"
+    : "CLOUD MODE (external LLM providers enabled)";
 const mode = process.env.MCP_TRANSPORT ?? "stdio";
 if (mode === "http") {
     const port = Number(process.env.PORT ?? 3333);
@@ -110,10 +116,10 @@ if (mode === "http") {
     };
     await server.connect(transport);
     await new Promise((resolve) => httpServer.listen(port, resolve));
-    console.log(`ReasonSuite server listening on HTTP ${port}`);
+    console.error(`ReasonSuite server listening on HTTP ${port} - ${modeDescription}`);
 }
 else {
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    console.log("ReasonSuite server on stdio");
+    console.error(`ReasonSuite server on stdio - ${modeDescription}`);
 }

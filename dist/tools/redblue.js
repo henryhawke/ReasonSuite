@@ -56,18 +56,28 @@ ${STRICT_JSON_REMINDER}
 
 JSON schema to emit:
 {
- "rounds":[
-   {"n":1,"red":{"attack":"..."}, "blue":{"defense":"...","mitigations":["..."]}}
- ],
- "defects":[{"type":"...","severity":"low|med|high","evidence":"..."}],
- "risk_matrix":{"low":[],"medium":[],"high":[]},
- "final_guidance":["..."]
+  "rounds": [
+    {
+      "n": 1,
+      "red": {"attack": "..."},
+      "blue": {"defense": "...", "mitigations": ["..."]}
+    }
+  ],
+  "defects": [
+    {"type": "...", "severity": "low|med|high", "evidence": "..."}
+  ],
+  "risk_matrix": {
+    "low": [],
+    "medium": [],
+    "high": []
+  },
+  "final_guidance": ["..."]
 }
-Return only that JSON object.`;
+Return only valid JSON matching this exact schema.`;
         const { text } = await sampleStructuredJson({
             server,
             prompt,
-            maxTokens: 2000,
+            maxTokens: 2500,
             schema: OutputSchema,
             fallback: () => ({
                 rounds: Array.from({ length: rounds || 2 }, (_, idx) => ({
