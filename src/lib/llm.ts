@@ -1,6 +1,9 @@
 import http from "node:http";
 import https from "node:https";
 import { URL } from "node:url";
+import { createHash } from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 
 type JsonHeaders = Record<string, string>;
 
@@ -27,7 +30,33 @@ type DirectSampleFailure = {
 
 export type DirectSampleResult = DirectSampleSuccess | DirectSampleFailure;
 
+let dotenvLoaded = false;
+
+function loadDotenvIfNeeded(): void {
+    if (dotenvLoaded) return;
+    dotenvLoaded = true;
+    try {
+        const envPath = path.resolve(process.cwd(), ".env");
+        if (!fs.existsSync(envPath)) return;
+        const content = fs.readFileSync(envPath, "utf-8");
+        for (const line of content.split(/\r?\n/)) {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith("#")) continue;
+            const eqIdx = trimmed.indexOf("=");
+            if (eqIdx === -1) continue;
+            const key = trimmed.slice(0, eqIdx).trim();
+            const value = trimmed.slice(eqIdx + 1).trim();
+            if (key && !(key in process.env)) {
+                process.env[key] = value;
+            }
+        }
+    } catch {
+        // Ignore dotenv loading errors; environment may already be configured
+    }
+}
+
 function readEnv(name: string): string | undefined {
+    loadDotenvIfNeeded();
     const value = process.env[name];
     if (!value) {
         return undefined;
@@ -49,7 +78,7 @@ function collectBody(res: http.IncomingMessage): Promise<string> {
     });
 }
 
-async function postJson(urlString: string, body: Record<string, unknown>, headers: JsonHeaders): Promise<JsonValue> {
+async function postJson(urlString: string, body: Record<string, unknown>, headers: JsonHeaders, timeoutMs = 15000): Promise<JsonValue> {
     const url = new URL(urlString);
     const payload = JSON.stringify(body);
     const isHttps = url.protocol === "https:";
@@ -91,6 +120,11 @@ async function postJson(urlString: string, body: Record<string, unknown>, header
                 }
             }
         );
+
+        req.setTimeout(timeoutMs, () => {
+            req.destroy();
+            reject(new Error(`Request timeout after ${timeoutMs}ms`));
+        });
 
         req.on("error", (err) => reject(err));
         req.write(payload);
@@ -153,38 +187,135 @@ async function callAnthropic(prompt: string, maxTokens: number): Promise<DirectP
     return { raw: text, provider: `anthropic:${model}` };
 }
 
+async function callOpenRouter(prompt: string, maxTokens: number): Promise<DirectProviderResult> {
+    const apiKey = readEnv("OPENROUTER_API_KEY");
+    if (!apiKey) {
+        throw new Error("OPENROUTER_API_KEY not configured");
+    }
+    const model = readEnv("OPENROUTER_MODEL") ?? "meta-llama/llama-3.1-8b-instruct";
+    const baseUrl = readEnv("OPENROUTER_BASE_URL") ?? "https://openrouter.ai/api/v1";
+    const temperature = Number(readEnv("OPENROUTER_TEMPERATURE") ?? "0.2");
+
+    // Add helpful headers for better rate limiting and debugging
+    const headers: JsonHeaders = {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://github.com/your-repo/reasonsuite", // Replace with your actual repo
+        "X-Title": "ReasonSuite",
+    };
+
+    const body = {
+        model,
+        messages: [{ role: "user", content: prompt }],
+        temperature: Number.isFinite(temperature) ? temperature : 0.2,
+        max_tokens: maxTokens,
+    };
+
+    const response = await postJson(`${baseUrl}/chat/completions`, body, headers);
+
+    const text = (response as any)?.choices?.[0]?.message?.content;
+    if (typeof text !== "string" || !text.trim()) {
+        throw new Error("OpenRouter response did not include text content");
+    }
+    return { raw: text, provider: `openrouter:${model}` };
+}
+
+// Simple in-memory cache for LLM responses
+const responseCache = new Map<string, { result: DirectSampleResult; timestamp: number }>();
+const CACHE_TTL = 1000 * 60 * 60; // 1 hour TTL
+
+function getCacheKey(prompt: string, maxTokens: number): string {
+    // Use hash for better cache performance with long prompts
+    const hash = createHash('md5').update(prompt).digest('hex').substring(0, 8);
+    return `${hash}:${maxTokens}`;
+}
+
+function getCachedResult(prompt: string, maxTokens: number): DirectSampleResult | null {
+    const key = getCacheKey(prompt, maxTokens);
+    const cached = responseCache.get(key);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+        return cached.result;
+    }
+    if (cached) {
+        responseCache.delete(key); // Remove expired entry
+    }
+    return null;
+}
+
+function setCacheResult(prompt: string, maxTokens: number, result: DirectSampleResult): void {
+    const key = getCacheKey(prompt, maxTokens);
+    responseCache.set(key, { result, timestamp: Date.now() });
+}
+
 export async function directLLMSample(prompt: string, maxTokens: number): Promise<DirectSampleResult | null> {
-    const providers: { label: string; invoke: DirectProvider }[] = [];
-
-    if (readEnv("OPENAI_API_KEY")) {
-        providers.push({ label: "openai", invoke: () => callOpenAI(prompt, maxTokens) });
+    // Check cache first
+    const cachedResult = getCachedResult(prompt, maxTokens);
+    if (cachedResult) {
+        return cachedResult;
     }
 
-    if (readEnv("ANTHROPIC_API_KEY")) {
-        providers.push({ label: "anthropic", invoke: () => callAnthropic(prompt, maxTokens) });
-    }
-
-    if (providers.length === 0) {
-        return null;
-    }
+    const providers = [
+        { name: "OpenRouter", fn: callOpenRouter },
+        { name: "OpenAI", fn: callOpenAI },
+        { name: "Anthropic", fn: callAnthropic },
+    ];
 
     const errors: string[] = [];
-    for (const { label, invoke } of providers) {
+
+    for (const provider of providers) {
         try {
-            const { raw, provider } = await invoke();
-            return {
+            const result = await provider.fn(prompt, maxTokens);
+            const sampleResult: DirectSampleResult = {
                 success: true,
-                raw,
-                provider,
-                warnings: [`Used direct ${provider} fallback because MCP host sampling was unavailable.`],
+                raw: result.raw,
+                provider: result.provider,
+                warnings: []
             };
+
+            // Cache successful result
+            setCacheResult(prompt, maxTokens, sampleResult);
+            return sampleResult;
         } catch (error: any) {
-            errors.push(`${label}: ${error?.message ?? String(error)}`);
+            errors.push(`${provider.name} failed: ${error.message}`);
         }
     }
 
-    return {
+    // All providers failed
+    const failureResult: DirectSampleResult = {
         success: false,
-        reason: errors.join("; ") || "Direct LLM fallback failed",
+        reason: `All providers failed: ${errors.join("; ")}`
+    };
+
+    // Cache failure result too (with shorter TTL)
+    setCacheResult(prompt, maxTokens, failureResult);
+    return failureResult;
+}
+
+// Utility functions for cache management and configuration
+export function clearLLMCache(): void {
+    responseCache.clear();
+}
+
+export function getCacheStats(): { size: number; maxAge: number; ttl: number } {
+    const now = Date.now();
+    let oldestTimestamp = now;
+    for (const cached of responseCache.values()) {
+        if (cached.timestamp < oldestTimestamp) {
+            oldestTimestamp = cached.timestamp;
+        }
+    }
+    return {
+        size: responseCache.size,
+        maxAge: responseCache.size > 0 ? now - oldestTimestamp : 0,
+        ttl: CACHE_TTL
+    };
+}
+
+export function validateAPIConfiguration(): { openai: boolean; anthropic: boolean; openrouter: boolean; anyConfigured: boolean } {
+    return {
+        openai: !!readEnv("OPENAI_API_KEY"),
+        anthropic: !!readEnv("ANTHROPIC_API_KEY"),
+        openrouter: !!readEnv("OPENROUTER_API_KEY"),
+        anyConfigured: !!(readEnv("OPENAI_API_KEY") || readEnv("ANTHROPIC_API_KEY") || readEnv("OPENROUTER_API_KEY"))
     };
 }

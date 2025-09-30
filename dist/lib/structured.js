@@ -61,57 +61,21 @@ function tryParse(candidate) {
 export async function sampleStructuredJson({ server, prompt, maxTokens, schema, fallback }) {
     const warnings = [];
     let raw = "";
-    const hasMcpSampler = typeof server?.server?.createMessage === "function";
-    if (hasMcpSampler) {
-        const clientCapabilities = typeof server?.server?.getClientCapabilities === "function"
-            ? server.server.getClientCapabilities()
-            : undefined;
-        if (clientCapabilities && !clientCapabilities.sampling) {
-            warnings.push("Connected MCP client does not advertise sampling support.");
+    // Try to use direct LLM sampling first
+    try {
+        const llmResult = await directLLMSample(prompt, maxTokens);
+        if (llmResult && llmResult.success) {
+            raw = llmResult.raw;
         }
         else {
-            try {
-                const response = await server.server.createMessage({
-                    messages: [{ role: "user", content: { type: "text", text: prompt } }],
-                    maxTokens,
-                });
-                const content = response?.content;
-                if (content && typeof content?.text === "string") {
-                    raw = content.text;
-                }
-                else if (Array.isArray(content)) {
-                    const textPart = content.find((part) => typeof part?.text === "string");
-                    raw = textPart?.text ?? "";
-                }
-                else {
-                    warnings.push("LLM response did not include text content.");
-                }
-            }
-            catch (err) {
-                const message = err?.message ?? String(err);
-                if (typeof message === "string" && message.includes("MCP servers cannot make LLM calls")) {
-                    warnings.push("MCP host rejected sampling requests from this server; attempting direct fallback.");
-                }
-                else {
-                    warnings.push(`LLM sampling failed: ${message}`);
-                }
-            }
+            warnings.push("Direct LLM sampling failed; using deterministic fallback.");
         }
     }
-    else {
-        warnings.push("MCP host sampling is unavailable (no createMessage implementation).");
+    catch (err) {
+        warnings.push(`Direct LLM sampling failed: ${err.message}`);
     }
     if (!raw.trim()) {
-        const direct = await directLLMSample(prompt, maxTokens);
-        if (direct) {
-            if (direct.success) {
-                raw = direct.raw;
-                warnings.push(...direct.warnings);
-            }
-            else {
-                warnings.push(`Direct LLM fallback failed: ${direct.reason}`);
-            }
-        }
+        warnings.push("No response from LLM sampling; using deterministic fallback.");
     }
     const candidates = buildCandidates(raw);
     for (const candidate of candidates) {

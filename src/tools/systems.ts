@@ -29,7 +29,9 @@ const OutputSchema = z
 
 export function registerSystems(server: McpServer): void {
     const handler: ToolCallback<any> = async (rawArgs, _extra) => {
-        const { variables, context } = rawArgs as InputArgs;
+        // Validate and apply defaults to input arguments
+        const validatedArgs = InputSchema.parse(rawArgs);
+        const { variables = [], context } = validatedArgs;
         const prompt = `Build a concise causal loop diagram (CLD) for the system below.
 Variables: ${variables.join(", ") || "(discover reasonable variables)"}
 Context: ${context ?? ""}

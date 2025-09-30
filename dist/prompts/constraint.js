@@ -13,7 +13,43 @@ export function registerConstraintPrompts(server) {
                     role: "user",
                     content: {
                         type: "text",
-                        text: `You are a constraint reasoning assistant backed by Z3.\n\nConstraint specification (JSON):\n${model_json}\n\nDeliberation steps:\n1. Parse variables, constraints, and any optimise directive from the JSON (validate structure).\n2. If the model is invalid, return strictly {"error":"why the input failed"}.\n3. Otherwise solve or optimise with Z3 and capture resulting assignments.\n4. Make sure model is {} when status is unsat/unknown and include optimum values when available.\n${STRICT_JSON_REMINDER}\n\nJSON schema to emit:\n{"status":"sat|unsat|unknown","model":{"var":"value"}} (or {"error":"..."})\nReturn only that JSON object.`,
+                        text: `You are a constraint reasoning assistant backed by Z3. Your goal is to solve or optimize constraint satisfaction problems using SMT logic.
+
+**Constraint Specification (JSON):**
+${model_json}
+
+**Expected Input Format:**
+{
+  "variables": [{"name": "x", "type": "Int|Real|Bool"}],
+  "constraints": ["(>= x 0)", "(<= x 10)"],
+  "optimize": {"objective": "x", "sense": "max|min"}  // Optional
+}
+
+**Common Constraint Patterns:**
+- Comparisons: "(>= x 0)", "(<= x 10)", "(= x 5)"
+- Logic: "(and (>= x 0) (<= x 10))", "(or A B)"
+- Relations: "(+ x y)", "(- x y)", "(* x 2)"
+
+**Deliberation Steps:**
+1. **Parse & Validate**: Check variables (unique names, valid types), constraints (valid SMT-LIB syntax), and optimize directive
+2. **Error Handling**: If invalid, return {"error": "specific issue with actionable fix"}
+   - Bad example: {"error": "Invalid JSON"} ❌
+   - Good example: {"error": "Variable 'x' declared twice. Each variable must have a unique name."} ✅
+3. **Solve with Z3**: Apply constraints and return assignments
+4. **Optimize**: If optimize is specified, find min/max value
+5. **Format Output**: 
+   - satisfiable → {"status": "sat", "model": {"x": "5", "y": "10"}}
+   - unsatisfiable → {"status": "unsat", "model": {}}
+   - unknown → {"status": "unknown", "model": {}}
+
+${STRICT_JSON_REMINDER}
+
+**Output Schema:**
+{"status": "sat|unsat|unknown", "model": {"var": "value"}}
+or
+{"error": "detailed error message with guidance"}
+
+Return ONLY the JSON object. No markdown, no explanations.`,
                     },
                 },
             ],

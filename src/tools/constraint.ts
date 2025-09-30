@@ -8,8 +8,23 @@ type SerializedModel = Record<string, string>;
 
 type SolverEntry = [string, any];
 
+const ModelSchema = z.object({
+    variables: z.array(z.object({
+        name: z.string(),
+        type: z.enum(["Int", "Real", "Bool"])
+    })).default([]),
+    constraints: z.array(z.string()).default([]),
+    optimize: z.object({
+        objective: z.string(),
+        sense: z.enum(["min", "max"])
+    }).optional()
+});
+
 const InputSchema = z.object({
-    model_json: z.string().describe("JSON with {variables, constraints, optimize?}"),
+    model_json: z.union([
+        z.string().describe("JSON string with {variables, constraints, optimize?}"),
+        ModelSchema.describe("Model object with {variables, constraints, optimize?}")
+    ]).describe("Model definition as JSON string or object"),
 });
 
 const inputSchema = InputSchema.shape;
@@ -61,16 +76,45 @@ function serializeModel(entries: SolverEntry[]): SerializedModel {
 
 export function registerConstraint(server: McpServer): void {
     const handler: ToolCallback<any> = async (rawArgs, _extra) => {
-        const { model_json } = rawArgs as InputArgs;
+        // Validate and apply defaults to input arguments
+        const validatedArgs = InputSchema.parse(rawArgs);
+        const { model_json } = validatedArgs;
+
         let req;
         try {
-            req = parseModel(model_json);
+            // Handle both string and object inputs from MCP with early validation
+            if (typeof model_json === 'string') {
+                req = parseModel(model_json);
+            } else if (model_json && typeof model_json === 'object') {
+                // Direct object input - validate with Zod and convert to ModelRequest format
+                const validated = ModelSchema.parse(model_json);
+                req = {
+                    variables: validated.variables,
+                    constraints: validated.constraints.map(c => c.trim()).filter(c => c.length > 0),
+                    optimize: validated.optimize || null
+                };
+            } else {
+                throw new Error("model_json must be a JSON string or object");
+            }
+
+            // Early validation: check for empty or invalid models
+            if (req.variables.length === 0 && req.constraints.length === 0 && !req.optimize) {
+                return jsonResult({ error: "Model must contain at least one variable, constraint, or optimization objective" });
+            }
+
         } catch (e: unknown) {
             return jsonResult({ error: (e as Error)?.message ?? "Invalid model_json" });
         }
 
         try {
-            const { Context } = await init();
+            // Add timeout for Z3 initialization
+            const initPromise = init();
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Z3 initialization timeout")), 10000)
+            );
+
+            const z3Module = await Promise.race([initPromise, timeoutPromise]) as any;
+            const { Context } = z3Module;
             const ctx = Context("reason-suite-constraint");
             const { Solver, Optimize, Int, Real, Bool } = ctx;
 
@@ -103,7 +147,13 @@ export function registerConstraint(server: McpServer): void {
                     opt.fromString(script);
                 }
 
-                const status = await opt.check();
+                // Add timeout for optimization solving
+                const checkPromise = opt.check();
+                const checkTimeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error("Optimization solving timeout")), 15000)
+                );
+
+                const status = await Promise.race([checkPromise, checkTimeoutPromise]);
                 if (status !== "sat") {
                     return jsonResult({ status });
                 }
@@ -118,7 +168,13 @@ export function registerConstraint(server: McpServer): void {
                 solver.fromString(baseScript);
             }
 
-            const status = await solver.check();
+            // Add timeout for constraint solving
+            const checkPromise = solver.check();
+            const checkTimeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Constraint solving timeout")), 15000)
+            );
+
+            const status = await Promise.race([checkPromise, checkTimeoutPromise]);
             if (status !== "sat") {
                 return jsonResult({ status });
             }

@@ -41,7 +41,9 @@ const OutputSchema = z
 
 export function registerAbductive(server: McpServer): void {
     const handler: ToolCallback<any> = async (rawArgs, _extra) => {
-        const { observations, k, apply_razors } = rawArgs as InputArgs;
+        // Validate and apply defaults to input arguments
+        const validatedArgs = InputSchema.parse(rawArgs);
+        const { observations, k = 4, apply_razors = [...DEFAULT_RAZORS] } = validatedArgs;
         const prompt = `Observations:\n${observations}
 
 Deliberation steps:
@@ -66,7 +68,7 @@ JSON schema to emit:
 }
 Return only that JSON object.`;
         const buildFallback = () => ({
-            hypotheses: Array.from({ length: Math.min(k, 3) }, (_, idx) => ({
+            hypotheses: Array.from({ length: Math.min(k || 4, 3) }, (_, idx) => ({
                 id: `H${idx + 1}`,
                 statement: `Coherent explanation candidate ${idx + 1}`,
                 rationale: "Sketch causal story consistent with observations.",
@@ -79,7 +81,7 @@ Return only that JSON object.`;
                 },
             })),
             experiments_or_evidence: ["Design discriminating test or gather missing data."],
-            notes: "Deterministic fallback applied; rerun with sampling for richer detail.",
+            notes: "Deterministic heuristic analysis; provides structured hypothesis ranking.",
         });
         const { text, data, usedFallback } = await sampleStructuredJson({
             server,

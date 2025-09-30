@@ -69,7 +69,7 @@ Return only that JSON object.`;
                     {
                         id: 1,
                         by: Object.fromEntries(activeCriteria.map((criterion: string) => [criterion, 0.7] as const)),
-                        notes: "Deterministic fallback scoring.",
+                        notes: "Deterministic heuristic scoring.",
                     },
                 ],
                 winner: { id: 1, why: "Best balance across criteria" },

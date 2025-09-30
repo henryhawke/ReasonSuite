@@ -37,17 +37,20 @@ const OutputSchema = z
     .extend({ meta: ReasoningMetadataSchema.optional() });
 export function registerRedBlue(server) {
     const handler = async (rawArgs, _extra) => {
-        const { proposal, rounds, focus } = rawArgs;
-        const prompt = `Conduct ${rounds} rounds of Red (attack) vs Blue (defense) on:
+        // Validate and apply defaults to input arguments
+        const validatedArgs = InputSchema.parse(rawArgs);
+        const { proposal, rounds = 2, focus = ["safety", "bias", "hallucination", "security", "privacy"] } = validatedArgs;
+        const prompt = `Conduct ${rounds} rounds of Red vs Blue adversarial analysis on:
 ${proposal}
 
 Focus areas: ${focus.join(", ")}.
 
-Deliberation steps:
-1. For each round capture the red attack (most concerning failure mode) and the blue defense with mitigation list.
-2. Aggregate defects with type, severity (low|med|high), and supporting evidence.
-3. Populate a risk_matrix listing low/medium/high risks.
-4. Provide final_guidance actions or sign-off criteria.
+For each round:
+1. Red Team: Identify the most critical attack vector or failure mode
+2. Blue Team: Provide defense strategy and specific mitigations
+3. Aggregate all defects found with severity and evidence
+4. Create risk matrix categorizing issues as low/medium/high
+5. Provide actionable final guidance
 
 ${STRICT_JSON_REMINDER}
 
@@ -64,12 +67,12 @@ Return only that JSON object.`;
         const { text } = await sampleStructuredJson({
             server,
             prompt,
-            maxTokens: 900,
+            maxTokens: 2000,
             schema: OutputSchema,
             fallback: () => ({
-                rounds: Array.from({ length: rounds }, (_, idx) => ({
+                rounds: Array.from({ length: rounds || 2 }, (_, idx) => ({
                     n: idx + 1,
-                    red: { attack: `Stress scenario ${idx + 1}: probe ${focus[idx % focus.length] ?? "failure"}` },
+                    red: { attack: `Stress scenario ${idx + 1}: probe ${focus?.[idx % (focus?.length || 5)] ?? "failure"}` },
                     blue: {
                         defense: "Document mitigations and residual risks.",
                         mitigations: ["Add guardrails", "Strengthen monitoring"],

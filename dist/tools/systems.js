@@ -21,7 +21,9 @@ const OutputSchema = z
     .extend({ meta: ReasoningMetadataSchema.optional() });
 export function registerSystems(server) {
     const handler = async (rawArgs, _extra) => {
-        const { variables, context } = rawArgs;
+        // Validate and apply defaults to input arguments
+        const validatedArgs = InputSchema.parse(rawArgs);
+        const { variables = [], context } = validatedArgs;
         const prompt = `Build a concise causal loop diagram (CLD) for the system below.
 Variables: ${variables.join(", ") || "(discover reasonable variables)"}
 Context: ${context ?? ""}

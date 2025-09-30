@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { textResult } from "../lib/mcp.js";
+import { jsonResult } from "../lib/mcp.js";
 import { STRICT_JSON_REMINDER } from "../lib/prompt.js";
 import { DEFAULT_RAZORS, summarizeRazors } from "../lib/razors.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
@@ -24,8 +24,15 @@ const OutputSchema = z
     .extend({ meta: ReasoningMetadataSchema.optional() });
 export function registerRazors(server) {
     const handler = async (rawArgs, _extra) => {
-        const { candidates_json, razors } = rawArgs;
-        const prompt = `Candidates JSON:\n${candidates_json}
+        try {
+            const parsed = InputSchema.safeParse(rawArgs);
+            if (!parsed.success) {
+                return jsonResult({ error: "Invalid arguments for razors.apply", issues: parsed.error.issues });
+            }
+            const { candidates_json, razors: rawRazors } = parsed.data;
+            const normalizedRazors = Array.isArray(rawRazors) ? rawRazors.filter((name) => typeof name === "string") : undefined;
+            const razors = normalizedRazors && normalizedRazors.length ? normalizedRazors : [...DEFAULT_RAZORS];
+            const prompt = `Candidates JSON:\n${candidates_json}
 Razors to apply (explain how each affects the verdict):
 ${summarizeRazors(razors)}
 
@@ -40,25 +47,34 @@ ${STRICT_JSON_REMINDER}
 JSON schema to emit:
 { "results": [{"id":"...","keep_or_drop":"keep|drop|revise","reasons":["..."],"risk_notes":"..."}], "shortlist": ["ids..."], "notes": "..." }
 Return only that JSON object.`;
-        const { text } = await sampleStructuredJson({
-            server,
-            prompt,
-            maxTokens: 700,
-            schema: OutputSchema,
-            fallback: () => ({
-                results: [
-                    {
-                        id: "candidate-1",
-                        keep_or_drop: "keep",
-                        reasons: ["Simplest explanation consistent with MDL", "Survives Popper falsifiability"],
-                        risk_notes: "Monitor for new contradictory evidence",
-                    },
-                ],
-                shortlist: ["candidate-1"],
-                notes: "Deterministic fallback applied; validate candidates_json structure.",
-            }),
-        });
-        return textResult(text);
+            const { data } = await sampleStructuredJson({
+                server,
+                prompt,
+                maxTokens: 700,
+                schema: OutputSchema,
+                fallback: () => ({
+                    results: [
+                        {
+                            id: "candidate-1",
+                            keep_or_drop: "keep",
+                            reasons: [
+                                "Simplest explanation consistent with MDL",
+                                "Survives Popper falsifiability",
+                            ],
+                            risk_notes: "Monitor for new contradictory evidence",
+                        },
+                    ],
+                    shortlist: ["candidate-1"],
+                    notes: "Deterministic heuristic analysis; validate candidates_json structure.",
+                }),
+            });
+            return jsonResult(data);
+        }
+        catch (error) {
+            const message = error?.message ?? String(error);
+            const stack = typeof error?.stack === "string" ? error.stack : undefined;
+            return jsonResult({ error: "razors.apply internal failure", message, stack });
+        }
     };
     server.registerTool("razors.apply", {
         title: "Apply reasoning razors",

@@ -452,7 +452,7 @@ export function buildFallback(
         razor_stack: razorScores,
         decision_path: decisionPath.slice(0, 4),
         next_action: nextAction,
-        notes: "Deterministic heuristic fallback. Re-run with model sampling for richer rationale.",
+        notes: "Deterministic heuristic response. Uses rule-based reasoning for consistent results.",
     };
 }
 

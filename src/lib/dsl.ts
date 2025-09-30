@@ -36,16 +36,36 @@ export function parseModel(json: string): ModelRequest {
     let parsed: unknown;
     try {
         parsed = JSON.parse(json);
-    } catch {
-        throw new Error("model_json is not valid JSON");
+    } catch (e) {
+        const error = e as Error;
+        throw new Error(
+            `Invalid JSON format. ${error.message}. ` +
+            `Expected format: {"variables": [{"name": "x", "type": "Int"}], "constraints": ["(>= x 0)"]}`
+        );
     }
 
-    const result = modelSchema.parse(parsed);
+    let result;
+    try {
+        result = modelSchema.parse(parsed);
+    } catch (e: any) {
+        const zodError = e.errors?.[0];
+        if (zodError) {
+            const path = zodError.path.join('.');
+            throw new Error(
+                `Validation error at '${path}': ${zodError.message}. ` +
+                `Check that variables have 'name' and 'type' fields, and constraints are strings.`
+            );
+        }
+        throw new Error(`Model validation failed: ${e.message}`);
+    }
 
     const seen = new Set<string>();
     for (const v of result.variables) {
         if (seen.has(v.name)) {
-            throw new Error(`Duplicate variable name: ${v.name}`);
+            throw new Error(
+                `Duplicate variable name '${v.name}'. Each variable must have a unique name. ` +
+                `Current variables: ${result.variables.map(v => v.name).join(', ')}`
+            );
         }
         seen.add(v.name);
     }
