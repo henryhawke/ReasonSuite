@@ -2,7 +2,7 @@
 
 MCP for using logical razors and types of reasoning. ReasonSuite is a structured thinking framework that helps a model work through any problem. Give your model trusted logical heuristics instead of relying solely on an llm's emergent reasoning.
 
-** npm i reasonsuite **
+```npm i reasonsuite```
 
 [![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=ReasonSuite&config=eyJjb21tYW5kIjoibnB4IC15IHJlYXNvbnN1aXRlIn0%3D)
 
