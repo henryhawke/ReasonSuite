@@ -1,6 +1,83 @@
-# ReasonSuite Master Prompt Template
+# ReasonSuite Usage Guide
 
-Use this template to drive high-quality, structured outputs from ReasonSuite tools. Adapt the sections to your task; keep JSON responses strict and machine-parseable.
+Use this guide to effectively select and use ReasonSuite's structured reasoning tools. All tools return strict JSON conforming to defined schemas.
+
+## Quick Start: When to Use Each Tool
+
+**Before starting ANY task, check this decision tree:**
+
+1. **Multi-step or complex?** → `reasoning.router.plan`
+2. **Uncertain which tool?** → `reasoning.selector`
+3. **Match your need to a tool below** → Call that tool directly
+
+## ⚠️ REQUIRED PARAMETERS CHECKLIST
+
+**⚠️ CRITICAL: Before calling ANY tool, verify you have provided the required primary parameter:**
+
+| Tool | Required Parameter | Example |
+|------|-------------------|---------|
+| `abductive.hypothesize` | `observations` | Observations about phenomenon to explain |
+| `reasoning.router.plan` | `task` | Task description to plan |
+| `socratic.inquire` | `topic` | Topic to clarify |
+| `reasoning.divergent_convergent` | `prompt` | Prompt for idea generation |
+| `redblue.challenge` | `proposal` | Proposal to challenge |
+| `systems.map` | `variables` or `context` | Variables/context to map |
+| `constraint.solve` | `model_json` | Constraint model definition |
+| `analogical.map` | `source_domain`, `target_problem` | Source domain and target problem |
+| `dialectic.tas` | `claim` | Claim to debate |
+| `reasoning.scientific` | `goal` | Goal to achieve |
+| `exec.run` | `code` | JavaScript code to execute |
+| `reasoning.self_explain` | `query` | Query to explain reasoning for |
+
+**⚠️ FAILURE TO PROVIDE REQUIRED PARAMETERS WILL CAUSE VALIDATION ERRORS**
+
+## Common Usage Errors and How to Avoid Them
+
+### ❌ WRONG: Calling abductive.hypothesize without observations
+
+```javascript
+// This will fail with validation error
+abductive.hypothesize({
+  "k": 3,
+  "apply_razors": ["MDL", "BayesianOccam"]
+})
+```
+
+### ✅ CORRECT: Always provide observations for abductive.hypothesize
+
+```javascript
+// This works correctly
+abductive.hypothesize({
+  "observations": "API response time increased from 200ms to 2000ms over 24 hours. Error rates also spiked from 0.1% to 5%. Database queries are taking 3x longer than normal.",
+  "k": 3,
+  "apply_razors": ["MDL", "BayesianOccam", "Sagan", "Hitchens", "Hanlon", "Popper"]
+})
+```
+
+### Tool Usage Checklist Before Every Call
+
+1. **✅ Identify the tool** you need based on the task pattern
+2. **✅ Check the required parameter** for that tool from the checklist above
+3. **✅ Ensure the required parameter** is provided and is the correct type
+4. **✅ Add optional parameters** as needed
+5. **✅ Call the tool** and handle any validation errors
+
+### Example: Diagnosing Performance Issues
+
+**Task:** "Why is my API slow?"
+
+1. **Pattern match:** This is a diagnosis/root cause question → `abductive.hypothesize`
+2. **Required parameter:** `observations` (string describing the issue)
+3. **Call the tool:**
+
+   ```javascript
+   abductive.hypothesize({
+     "observations": "API response times have increased from 200ms to 2000ms over the past 24 hours. Database query times have tripled. Error rates increased from 0.1% to 5%.",
+     "k": 4
+   })
+   ```
+
+4. **Expected result:** Ranked hypotheses about possible causes
 
 ## Master Template (Router-led or Manual)
 
@@ -33,19 +110,21 @@ MaxSteps: 3-5
 
 Return strictly formatted JSON per tool schemas below.
 
-### Tool-First Execution Protocol (MANDATORY)
+### Tool-First Execution Protocol (Default Flow)
 
-Follow this sequence to ensure tools are actually used rather than freehand reasoning:
+Use this sequence to stay tool-led; skip steps deliberately when the task is already scoped:
 
 1) Selection
 
-- Call `reasoning.selector` with { request, context? }.
-- Obey `primary_mode` and queue the returned `razor_stack` for pruning later.
+- When unsure which tool fits, call `reasoning.selector` with { request, context? }.
+- If the request already maps cleanly to a tool (e.g., "generate hypotheses"), you may go straight to that tool and note the rationale.
+- When you do run the selector, obey `primary_mode` and queue the returned `razor_stack` for pruning later.
 
 2) Planning
 
-- If the task is multi-step or ambiguous, call `reasoning.router.plan` with { task, context?, maxSteps }.
-- Execute the plan steps strictly in order. Do not skip steps unless infeasible.
+- For multi-step or ambiguous work, call `reasoning.router.plan` with { task, context?, maxSteps }.
+- If the plan is obvious (single calculation, one-off clarification), document the reason for skipping the router instead of forcing an extra call.
+- Execute the plan steps in order when a plan is generated. Note any infeasible step and choose an alternative tool explicitly.
 
 3) Execution Rules (per step)
 
@@ -54,12 +133,12 @@ Follow this sequence to ensure tools are actually used rather than freehand reas
 - Use `exec.run` for all calculations, code, parsing, or regex. Do not compute by hand.
 - Use `constraint.solve` whenever numeric/logical limits or optimization appear.
 - Use `redblue.challenge` before final answers when risk/safety/security/compliance is implicated.
-- Use `reasoning.scientific` to structure experiments, evidence, and validation.
+- Use `reasoning.scientific` to structure experiments, evidence, and validation when the task calls for testing.
 - Use `systems.map` when feedback loops/dynamics are present; `analogical.map` for precedent/transfer.
 
 4) Synthesis
 
-- After executing the plan, call `reasoning.self_explain` to produce a concise rationale and next actions.
+- Call `reasoning.self_explain` when transparency, audit trail, or self-critique is requested. Otherwise summarise findings directly in the controlling workflow.
 
 5) Output Contract
 
@@ -183,29 +262,39 @@ Return strict JSON only:
 - In systems maps, include at least one reinforcing and one balancing loop where plausible.
 - Always list assumptions and next actions to enable follow-on execution.
 
-### Tool Usage Guidance (Meta-Selection)
+### Tool Selection Guide (Trigger Patterns)
 
-Always call `reasoning.selector` first with the user's request and optional context.
-If the task is multi-step or ambiguous, immediately call `reasoning.router.plan` and then execute steps in order (no skipping).
-Between steps, apply `razors.apply` after any generator outputs; prefer `exec.run` for all computation.
+**ALWAYS** call `reasoning.selector` or `reasoning.router.plan` first unless you have a clear direct match below.
 
-Use these cues to trigger tools when the selector is unavailable:
+| Your Need | Tool to Use | Trigger Words | Must Pair With |
+|-----------|-------------|---------------|----------------|
+| Diagnose, debug, root cause | `abductive.hypothesize` | "why", "what caused", "diagnose", "investigate" | `razors.apply` |
+| Unclear scope, vague request | `socratic.inquire` | "improve", "better", "help with", ambiguous goals | - |
+| Generate ideas, brainstorm | `reasoning.divergent_convergent` | "options", "alternatives", "ideas", "brainstorm" | `razors.apply` |
+| Multi-step task, strategy | `reasoning.router.plan` | "plan", "design", "implement", "roadmap" | varies |
+| Uncertain which approach | `reasoning.selector` | anytime you're unsure | - |
+| Interacting systems, dynamics | `systems.map` | "feedback", "interactions", "system behavior" | - |
+| Comparisons, analogies | `analogical.map` | "similar to", "like", "compare", "precedent" | - |
+| Optimization, constraints | `constraint.solve` | "optimize", "minimize", "maximize", "schedule", "within limits" | - |
+| Risk, security, safety | `redblue.challenge` | "risk", "attack", "vulnerability", "what could go wrong" | - |
+| Debate, trade-offs | `dialectic.tas` | "pros vs cons", "trade-offs", "arguments for/against" | - |
+| Testing, validation | `reasoning.scientific` | "test", "validate", "experiment", "measure" | - |
+| Math, code, calculations | `exec.run` | any calculation, code snippet, regex | - |
+| Explain your thinking | `reasoning.self_explain` | "why did you", "explain", "reasoning", "rationale" | - |
 
-- Socratic (`socratic.inquire`): ambiguous scope, missing success criteria, undefined stakeholders.
-- Abductive (`abductive.hypothesize`): diagnosis/root cause questions, unexplained anomalies, “why”.
-- Razors (`razors.apply`): after abductive/divergent outputs, or when pruning options/claims.
-- Systems (`systems.map`): interacting factors, feedback loops, dynamics, ecosystems.
-- Analogical (`analogical.map`): precedent/comparison/analogy transfer with mismatch checks.
-- Constraint (`constraint.solve`): numeric/logical limits, scheduling, budget, optimise/minimise/maximise.
-- Red/Blue (`redblue.challenge`): risk/safety/security/bias/compliance prior to finalisation.
-- Dialectic (`dialectic.tas`): contested/trade-off/policy debates requiring synthesis.
-- Scientific (`reasoning.scientific`): experiments/tests/metrics/validation planning.
-- Self-Explain (`reasoning.self_explain`): transparency/audit/rationale demand.
-- Divergent (`reasoning.divergent_convergent`): brainstorm options, then prune with razors.
-- Exec (`exec.run`): quick sandboxed calculations or prototypes only.
+**Critical Rules:**
 
-Rules:
+1. If task needs 3+ steps → MUST use `reasoning.router.plan` first
+2. After `abductive.hypothesize` → MUST call `razors.apply`
+3. After `reasoning.divergent_convergent` → MUST call `razors.apply`
+4. For ANY calculation → MUST use `exec.run` (never compute manually)
+5. Before risky decisions → MUST use `redblue.challenge`
+6. If uncertain → MUST use `reasoning.selector`
 
-- Default to `socratic.inquire` if no strong signals are present.
-- Never duplicate the same tool in a plan unless justified by new evidence.
-- If any generator (abductive/divergent) runs, follow with `razors.apply` before conclusions.
+**Anti-Patterns (Don't do these):**
+
+- ❌ Skipping tools and doing analysis yourself
+- ❌ Using abductive/divergent without razors.apply afterwards
+- ❌ Ignoring router plan steps or reordering them
+- ❌ Computing math manually instead of using exec.run
+- ❌ Guessing which tool when selector is available

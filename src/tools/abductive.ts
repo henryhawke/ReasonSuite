@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { textResult, type ToolCallback } from "../lib/mcp.js";
+import { jsonResult, textResult, type ToolCallback } from "../lib/mcp.js";
 import { STRICT_JSON_REMINDER } from "../lib/prompt.js";
 import { DEFAULT_RAZORS, summarizeRazors } from "../lib/razors.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
@@ -42,8 +42,11 @@ const OutputSchema = z
 export function registerAbductive(server: McpServer): void {
     const handler: ToolCallback<any> = async (rawArgs, _extra) => {
         // Validate and apply defaults to input arguments
-        const validatedArgs = InputSchema.parse(rawArgs);
-        const { observations, k = 4, apply_razors = [...DEFAULT_RAZORS] } = validatedArgs;
+        const parsed = InputSchema.safeParse(rawArgs);
+        if (!parsed.success) {
+            return jsonResult({ error: "Invalid arguments for abductive.hypothesize", issues: parsed.error.issues });
+        }
+        const { observations, k = 4, apply_razors = [...DEFAULT_RAZORS] } = parsed.data;
         const prompt = `Observations:\n${observations}
 
 Deliberation steps:
@@ -67,22 +70,84 @@ JSON schema to emit:
  "notes": "..."
 }
 Return only that JSON object.`;
-        const buildFallback = () => ({
-            hypotheses: Array.from({ length: Math.min(k || 4, 3) }, (_, idx) => ({
-                id: `H${idx + 1}`,
-                statement: `Coherent explanation candidate ${idx + 1}`,
-                rationale: "Sketch causal story consistent with observations.",
-                scores: {
-                    prior_plausibility: 0.5 - idx * 0.05,
-                    explanatory_power: 0.6 - idx * 0.05,
-                    simplicity_penalty: 0.2 + idx * 0.1,
-                    testability: 0.6 - idx * 0.05,
-                    overall: 1.5 - idx * 0.1,
-                },
-            })),
-            experiments_or_evidence: ["Design discriminating test or gather missing data."],
-            notes: "Deterministic heuristic analysis; provides structured hypothesis ranking.",
-        });
+        const buildFallback = () => {
+            const desired = Math.min(Math.max(k ?? 4, 2), 10);
+            const tokens = (observations ?? "")
+                .toLowerCase()
+                .match(/\b[a-z0-9][a-z0-9\-]{2,}\b/g);
+            const stopWords = new Set([
+                "the",
+                "that",
+                "with",
+                "from",
+                "have",
+                "after",
+                "before",
+                "since",
+                "because",
+                "error",
+                "errors",
+                "issue",
+                "issues",
+                "spike",
+                "spikes",
+                "latency",
+                "latencies",
+                "users",
+                "using",
+                "during",
+                "every",
+                "hours",
+                "about",
+                "count",
+                "rate",
+                "rates",
+            ]);
+            const keywords = Array.from(new Set((tokens ?? []).filter((word) => !stopWords.has(word)))).slice(0, 6);
+            const highlights = observations
+                .split(/\.|\n/)
+                .map((piece) => piece.trim())
+                .filter((piece) => piece.length > 0)
+                .slice(0, 3);
+
+            const clamp = (value: number) => Math.max(0, Math.min(1, Number(value.toFixed(2))));
+
+            const hypotheses = Array.from({ length: desired }, (_, idx) => {
+                const keyword = keywords[idx % (keywords.length || 1)] ?? `factor ${idx + 1}`;
+                const highlight = highlights[idx % (highlights.length || 1)] ?? observations.slice(0, 120);
+                const focusPhrase = keyword.replace(/[-_]/g, " ");
+                const id = `H${idx + 1}`;
+                const prior = clamp(0.68 - idx * 0.08);
+                const explanatory = clamp(0.7 - idx * 0.07);
+                const simplicity = clamp(0.22 + idx * 0.05);
+                const testability = clamp(0.66 - idx * 0.05);
+                const overall = clamp(prior + explanatory + testability - simplicity);
+                return {
+                    id,
+                    statement: `The leading explanation centres on ${focusPhrase} behaving abnormally.`,
+                    rationale: highlight
+                        ? `Matches the observation: "${highlight.replace(/"/g, "'" )}" and fits the timing described.`
+                        : "Consistent with the overall anomaly pattern in the observations.",
+                    scores: {
+                        prior_plausibility: prior,
+                        explanatory_power: explanatory,
+                        simplicity_penalty: simplicity,
+                        testability: testability,
+                        overall,
+                    },
+                };
+            });
+
+            const experiments = (keywords.length ? keywords : ["the dominant anomaly"])
+                .slice(0, 3)
+                .map((word) => `Collect targeted telemetry around ${word} and compare pre/post baselines.`);
+
+            return {
+                hypotheses,
+                experiments_or_evidence: experiments,
+                notes: "Deterministic heuristic analysis; provides structured hypothesis ranking.",
+            };
+        };
         const { text, data, usedFallback } = await sampleStructuredJson({
             server,
             prompt,

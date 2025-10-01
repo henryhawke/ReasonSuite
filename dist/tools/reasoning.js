@@ -86,8 +86,19 @@ function normalizeArgs(mode, raw) {
     if (mode === "abductive" && !("apply_razors" in args)) {
         args.apply_razors = [...DEFAULT_RAZORS];
     }
-    if (mode === "razors" && !("razors" in args)) {
-        args.razors = [...DEFAULT_RAZORS];
+    if (mode === "razors") {
+        if (!("razors" in args)) {
+            args.razors = [...DEFAULT_RAZORS];
+        }
+        const candidates = args.candidates_json;
+        if (candidates && typeof candidates !== "string") {
+            try {
+                args.candidates_json = JSON.stringify(candidates);
+            }
+            catch {
+                // leave as-is to allow downstream validation to report the issue
+            }
+        }
     }
     if (mode === "constraint") {
         const candidate = args.model_json;

@@ -240,10 +240,10 @@ export function buildFallback(request, context, modes, razors) {
         addReason("divergent", "Creative/ideation language detected", 0.45);
         addReason("razors.apply", "Need to prune after ideation", 0.25);
     }, "Detected creative ideation cues (brainstorm/idea/etc.)", "Favors divergent exploration followed by razor pruning");
-    const hypotheses = detect(/diagnos|root cause|why|hypothes|investigat|anomal|myster|interpret/, () => {
+    const hypotheses = detect(/diagnos|root cause|why\b|hypothes|investigat|anomal|myster|interpret|debug|incident|outage|latenc|slow(?:down)?|failure|fault|bug|spike|error(?:\s|-)?rate|post[-\s]?mortem|alert|degrad/, () => {
         addReason("abductive", "Diagnosis/root-cause language", 0.4);
-        addReason("razors.apply", "Hypotheses benefit from razor screening", 0.22);
-    }, "Found diagnosis/root-cause cues", "Points to abductive hypothesis ranking and razor screening");
+        addReason("razors.apply", "Hypotheses benefit from razor screening", 0.2);
+    }, "Detected incident/diagnosis cues (debug/latency/error/etc.)", "Points to abductive hypothesis ranking and razor screening");
     detect(/system|feedback|loop|dynamic|ecosystem|interdepend|supply|demand|network|ripple/, () => addReason("systems", "Systems/dynamics vocabulary", 0.42), "Systems or dynamics terminology present", "Map causal loops and leverage points");
     const constraint = detect(/constraint|optimi[sz]|schedule|budget|allocat|limit|maximi|minimi|>=|<=|\b\d+\b|tradeoff curve|capacity/, () => addReason("constraint", "Optimization/constraint cues", 0.48), "Optimization or numeric constraints noted", "Prefer constraint solving to test feasibility");
     const risk = detect(/risk|safety|attack|threat|abuse|hazard|failure|compliance|bias|exploit|breach/, () => addReason("redblue", "Risk/threat keywords", 0.46), "Risk or adversarial words detected", "Red/blue challenge to stress-test mitigations");

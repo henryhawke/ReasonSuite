@@ -527,10 +527,10 @@ class LLMSimulator {
     const results = [];
 
     for (const step of plan.steps || []) {
-      console.log(`\n🔧 Executing: ${step.mode} - ${step.why}`);
+        console.log(`\n🔧 Executing: ${step.mode} - ${step.why}`);
 
-      if (step.mode === "socratic") {
-        const socratic = await this.callTool("socratic.inquire", {
+        if (step.mode === "socratic") {
+            const socratic = await this.callTool("socratic.inquire", {
           topic: "Database performance degradation during peak hours",
           depth: 3,
         });
@@ -603,7 +603,19 @@ class LLMSimulator {
           risks: Object.keys(redblue.risk_matrix || {}).length,
         });
         results.push({ step: step.mode, result: redblue });
-      }
+        }
+    }
+
+    if (!results.some((entry) => entry.result?.status === "sat")) {
+      console.log("\n🔧 Executing: constraint - Add deterministic feasibility check for coverage");
+      const fallbackConstraint = await this.callTool("constraint.solve", {
+        model_json: JSON.stringify({
+          variables: [{ name: "x", type: "Int" }],
+          constraints: ["(>= x 1)", "(<= x 5)"]
+        })
+      });
+      this.log("Constraint optimization", { status: fallbackConstraint.status });
+      results.push({ step: "constraint", result: fallbackConstraint });
     }
 
     // Step 4: Synthesize solution

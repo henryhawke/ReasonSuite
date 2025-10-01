@@ -35,6 +35,36 @@ type InputShape = typeof inputSchema;
 const SIMPLE_COMPARISON =
     /^([A-Za-z_][A-Za-z0-9_]*)\s*(<=|>=|==|=|!=|>|<)\s*([-+]?[A-Za-z0-9_\.]+)$/;
 
+const Z3_INIT_TIMEOUT_MS = 10_000;
+let z3ModulePromise: Promise<any> | null = null;
+
+async function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+    return await new Promise<T>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(message)), ms);
+        promise
+            .then((value) => {
+                clearTimeout(timer);
+                resolve(value);
+            })
+            .catch((error) => {
+                clearTimeout(timer);
+                reject(error);
+            });
+    });
+}
+
+async function loadZ3Module(): Promise<any> {
+    if (!z3ModulePromise) {
+        z3ModulePromise = init();
+    }
+    return withTimeout(z3ModulePromise, Z3_INIT_TIMEOUT_MS, "Z3 initialization timeout");
+}
+
+async function createZ3Context() {
+    const z3Module = await loadZ3Module();
+    return z3Module.Context("reason-suite-constraint");
+}
+
 function toSmtConstraint(raw: string): string {
     const trimmed = raw.trim();
     if (!trimmed) {
@@ -77,8 +107,11 @@ function serializeModel(entries: SolverEntry[]): SerializedModel {
 export function registerConstraint(server: McpServer): void {
     const handler: ToolCallback<any> = async (rawArgs, _extra) => {
         // Validate and apply defaults to input arguments
-        const validatedArgs = InputSchema.parse(rawArgs);
-        const { model_json } = validatedArgs;
+        const parsed = InputSchema.safeParse(rawArgs);
+        if (!parsed.success) {
+            return jsonResult({ error: "Invalid arguments for constraint.solve", issues: parsed.error.issues });
+        }
+        const { model_json } = parsed.data;
 
         let req;
         try {
@@ -107,15 +140,7 @@ export function registerConstraint(server: McpServer): void {
         }
 
         try {
-            // Add timeout for Z3 initialization
-            const initPromise = init();
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error("Z3 initialization timeout")), 10000)
-            );
-
-            const z3Module = await Promise.race([initPromise, timeoutPromise]) as any;
-            const { Context } = z3Module;
-            const ctx = Context("reason-suite-constraint");
+            const ctx = await createZ3Context();
             const { Solver, Optimize, Int, Real, Bool } = ctx;
 
             const declarations: string[] = [];

@@ -15,7 +15,150 @@ ReasonSuite used its own reasoning tools to analyze and improve itself:
 7. **Scientific Method** - Designed validation plan
 8. **Razor Screening** - Validated which improvements to prioritize
 
-## ✅ Key Findings
+---
+
+## 🚀 Latest Iteration: Error Handling Improvements (2025-09-30)
+
+### Issue Identified
+
+ReasonSuite MCP tools were returning raw Zod validation errors instead of structured JSON fallbacks when required fields were missing or malformed. This caused MCP client failures and poor user experience.
+
+**Root Cause:** Tools used `InputSchema.parse()` which throws on validation failure, bypassing the fallback mechanism.
+
+### Tools Used for Self-Diagnosis
+
+1. **reasoning.selector** - Identified Socratic inquiry as primary diagnostic mode
+2. **reasoning.router.plan** - Created multi-step diagnostic plan
+3. **socratic.inquire** - Clarified scope and success criteria
+4. **abductive.hypothesize** - Generated 4 hypotheses about error causes
+5. **razors.apply** - Screened hypotheses using MDL, Popper, and Bayesian razors
+6. **reasoning.self_explain** - Synthesized findings and validated fix strategy
+
+### Fix Applied
+
+Updated all affected tools to use `InputSchema.safeParse()` with graceful error handling:
+
+- ✅ `abductive.hypothesize` - Now returns structured error on invalid input
+- ✅ `systems.map` - Now returns structured error on invalid input  
+- ✅ `redblue.challenge` - Now returns structured error on invalid input
+- ✅ `constraint.solve` - Now returns structured error on invalid input
+
+**Pattern Applied:**
+
+```typescript
+// Before (throws error):
+const validatedArgs = InputSchema.parse(rawArgs);
+
+// After (graceful handling):
+const parsed = InputSchema.safeParse(rawArgs);
+if (!parsed.success) {
+    return jsonResult({ error: "Invalid arguments for tool.name", issues: parsed.error.issues });
+}
+```
+
+### Impact
+
+- ✅ All MCP tool responses now return valid JSON even on validation errors
+- ✅ Clients receive actionable error messages with field-level diagnostics
+- ✅ Fallback mechanisms activate correctly when LLM sampling fails
+- ✅ Consistent error handling across all reasoning tools
+
+---
+
+## 🎯 Latest Iteration: Improved Tool Usage Instructions (2025-09-30)
+
+### Issue Identified
+
+AI models (including Cursor AI) were not consistently recognizing when to use ReasonSuite tools, often attempting freehand reasoning instead of invoking appropriate tools.
+
+**Root Cause:** Instructions focused on output format rather than clear trigger patterns and decision rules for tool selection.
+
+### Tools Used for Self-Diagnosis
+
+1. **reasoning.selector** - Identified the prompt improvement task (though incorrectly suggested exec)
+2. **socratic.inquire** - Attempted to clarify requirements (returned fallback)
+3. Code inspection and manual analysis of existing rules
+
+### Improvements Applied
+
+#### 1. Updated `.cursor/rules/01-mcp-usage.mdc`
+
+**New Features:**
+
+- ✅ Clear decision tree at the top (multi-step? uncertain? pattern match?)
+- ✅ Comprehensive trigger pattern table mapping user requests to tools
+- ✅ Mandatory tool usage rules with examples
+- ✅ Common mistakes section with wrong vs. correct examples
+- ✅ Specific guidance for self-improvement tasks
+- ✅ Removed confusing output format requirements (those were for tools, not AI using tools)
+
+**Key Addition - Trigger Pattern Table:**
+
+```
+| Pattern in User Request | Required Tool | Example Triggers |
+|------------------------|---------------|------------------|
+| Diagnose, debug, "why?", root cause | abductive.hypothesize | "Why is X failing?" |
+| Plan, strategy, roadmap, multi-step | reasoning.router.plan | "How should I approach X?" |
+| Unclear scope, ambiguous requirements | socratic.inquire | "Make this better" |
+... (full table in file)
+```
+
+#### 2. Updated `src/resources/master-prompt.md`
+
+**New Features:**
+
+- ✅ Quick start decision tree at the top
+- ✅ Tool selection matrix with trigger words and pairing requirements
+- ✅ Critical rules section (MUST use X after Y)
+- ✅ Anti-pattern warnings with ❌ examples
+- ✅ Clearer focus on WHEN to use tools vs HOW they work
+
+**Pattern Improvements:**
+
+```markdown
+**Critical Rules:**
+1. If task needs 3+ steps → MUST use reasoning.router.plan first
+2. After abductive.hypothesize → MUST call razors.apply
+3. For ANY calculation → MUST use exec.run (never compute manually)
+... (full list in file)
+```
+
+### Impact
+
+**Expected Improvements:**
+
+- ✅ AI will recognize more situations where tools should be used
+- ✅ Reduced freehand reasoning when tools are available
+- ✅ Better tool chaining (e.g., always using razors after abductive)
+- ✅ More proactive use of reasoning.selector when uncertain
+- ✅ Consistent use of reasoning.router.plan for multi-step tasks
+
+**Measurable Changes:**
+
+- Decision tree prominently placed at top of both documents
+- 13 tool trigger patterns clearly documented with examples
+- 6 critical "MUST" rules for tool usage
+- Common mistakes section with wrong ❌ vs. correct ✅ examples
+- Removed confusing JSON output format requirements
+
+### Self-Improvement Process
+
+This iteration demonstrates ReasonSuite improving its own usability:
+
+1. Identified problem through usage observation
+2. Used own tools (selector, socratic) to analyze issue
+3. Applied fix by rewriting instructions for clarity
+4. Documented the meta-improvement process
+
+**Next Steps for Validation:**
+
+- Monitor whether AI consistently uses tools after these changes
+- Collect examples of improved vs. missed tool usage
+- Consider adding automated tests for tool selection logic
+
+---
+
+## ✅ Key Findings (Original Analysis)
 
 ### High Priority Issues Identified
 

@@ -10,6 +10,8 @@ type ExecResult = {
     timedOut: boolean;
 };
 
+type TimerHandler = Parameters<typeof setTimeout>[0];
+
 const InputSchema = z.object({
     code: z
         .string()
@@ -25,6 +27,19 @@ type InputShape = typeof inputSchema;
 function runInSandbox(code: string, timeoutMs: number): ExecResult {
     const stdout: string[] = [];
     const stderr: string[] = [];
+    const activeTimeouts = new Set<ReturnType<typeof setTimeout>>();
+    const activeIntervals = new Set<ReturnType<typeof setInterval>>();
+
+    const cleanupTimers = () => {
+        for (const handle of activeTimeouts) {
+            clearTimeout(handle);
+        }
+        for (const handle of activeIntervals) {
+            clearInterval(handle);
+        }
+        activeTimeouts.clear();
+        activeIntervals.clear();
+    };
 
     const sandboxConsole = {
         log: (...args: unknown[]) => stdout.push(args.map(String).join(" ")),
@@ -32,13 +47,73 @@ function runInSandbox(code: string, timeoutMs: number): ExecResult {
         warn: (...args: unknown[]) => stderr.push(args.map(String).join(" ")),
     } as const;
 
+    const trackedSetTimeout = (
+        handler: TimerHandler,
+        timeout?: number,
+        ...args: any[]
+    ): ReturnType<typeof setTimeout> => {
+        if (typeof handler !== "function") {
+            const message = "setTimeout in exec sandbox requires a function handler.";
+            stderr.push(message);
+            throw new TypeError(message);
+        }
+        let handle: ReturnType<typeof setTimeout>;
+        const wrappedHandler = (...cbArgs: any[]) => {
+            activeTimeouts.delete(handle);
+            try {
+                (handler as (...innerArgs: any[]) => unknown)(...cbArgs);
+            } catch (err) {
+                stderr.push((err as Error)?.stack ?? String(err));
+            }
+        };
+        handle = setTimeout(wrappedHandler, timeout, ...args);
+        activeTimeouts.add(handle);
+        return handle;
+    };
+
+    const trackedSetInterval = (
+        handler: TimerHandler,
+        timeout?: number,
+        ...args: any[]
+    ): ReturnType<typeof setInterval> => {
+        if (typeof handler !== "function") {
+            const message = "setInterval in exec sandbox requires a function handler.";
+            stderr.push(message);
+            throw new TypeError(message);
+        }
+        const wrappedHandler = (...cbArgs: any[]) => {
+            try {
+                (handler as (...innerArgs: any[]) => unknown)(...cbArgs);
+            } catch (err) {
+                stderr.push((err as Error)?.stack ?? String(err));
+            }
+        };
+        const handle = setInterval(wrappedHandler, timeout, ...args);
+        activeIntervals.add(handle);
+        return handle;
+    };
+
+    const trackedClearTimeout = (handle: ReturnType<typeof setTimeout> | undefined): void => {
+        if (handle) {
+            activeTimeouts.delete(handle);
+            clearTimeout(handle);
+        }
+    };
+
+    const trackedClearInterval = (handle: ReturnType<typeof setInterval> | undefined): void => {
+        if (handle) {
+            activeIntervals.delete(handle);
+            clearInterval(handle);
+        }
+    };
+
     const sandbox: Record<string, unknown> = {
         console: sandboxConsole,
         print: (v: unknown) => stdout.push(String(v)),
-        setTimeout,
-        setInterval,
-        clearTimeout,
-        clearInterval,
+        setTimeout: trackedSetTimeout,
+        setInterval: trackedSetInterval,
+        clearTimeout: trackedClearTimeout,
+        clearInterval: trackedClearInterval,
     };
 
     const context = createContext(sandbox, { codeGeneration: { strings: true, wasm: false } });
@@ -53,6 +128,8 @@ function runInSandbox(code: string, timeoutMs: number): ExecResult {
         } else {
             stderr.push((err as Error)?.stack ?? String(err));
         }
+    } finally {
+        cleanupTimers();
     }
 
     return { stdout, stderr, result, timedOut };

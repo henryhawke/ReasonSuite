@@ -22,6 +22,7 @@ import { registerSelfExplain } from "./tools/self_explain.js";
 import { registerDivergent } from "./tools/divergent.js";
 import { registerExec } from "./tools/exec.js";
 import { registerSelector } from "./tools/selector.js";
+import { registerReasoning } from "./tools/reasoning.js";
 
 // Prompts
 import { registerDialecticPrompts } from "./prompts/dialectic.js";
@@ -56,6 +57,7 @@ registerSelfExplain(server);
 registerDivergent(server);
 registerExec(server);
 registerSelector(server);
+registerReasoning(server);
 
 // Register prompts
 registerDialecticPrompts(server);

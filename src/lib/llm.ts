@@ -14,7 +14,7 @@ type DirectProviderResult = {
     provider: string;
 };
 
-type DirectProvider = () => Promise<DirectProviderResult>;
+type DirectProvider = (prompt: string, maxTokens: number) => Promise<DirectProviderResult>;
 
 type DirectSampleSuccess = {
     success: true;
@@ -221,31 +221,71 @@ async function callOpenRouter(prompt: string, maxTokens: number): Promise<Direct
 }
 
 // Simple in-memory cache for LLM responses
-const responseCache = new Map<string, { result: DirectSampleResult; timestamp: number }>();
-const CACHE_TTL = 1000 * 60 * 60; // 1 hour TTL
+type CacheEntry = {
+    result: DirectSampleResult;
+    timestamp: number;
+    ttl: number;
+};
+
+const SUCCESS_CACHE_TTL_MS = 1000 * 60 * 60; // 1 hour
+const FAILURE_CACHE_TTL_MS = 1000 * 60 * 5; // 5 minutes
+const MAX_CACHE_ENTRIES = 256;
+
+const responseCache = new Map<string, CacheEntry>();
 
 function getCacheKey(prompt: string, maxTokens: number): string {
-    // Use hash for better cache performance with long prompts
-    const hash = createHash('md5').update(prompt).digest('hex').substring(0, 8);
-    return `${hash}:${maxTokens}`;
+    // Use a longer hash and include prompt length to avoid collisions on large workloads
+    const hash = createHash("sha256").update(prompt).digest("hex");
+    return `${maxTokens}:${prompt.length}:${hash}`;
 }
 
 function getCachedResult(prompt: string, maxTokens: number): DirectSampleResult | null {
     const key = getCacheKey(prompt, maxTokens);
     const cached = responseCache.get(key);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-        return cached.result;
+    if (!cached) {
+        return null;
     }
-    if (cached) {
-        responseCache.delete(key); // Remove expired entry
+
+    const age = Date.now() - cached.timestamp;
+    if (age > cached.ttl) {
+        responseCache.delete(key);
+        return null;
     }
-    return null;
+
+    // Touch entry to maintain simple LRU semantics
+    responseCache.delete(key);
+    responseCache.set(key, cached);
+    return cached.result;
 }
 
 function setCacheResult(prompt: string, maxTokens: number, result: DirectSampleResult): void {
     const key = getCacheKey(prompt, maxTokens);
-    responseCache.set(key, { result, timestamp: Date.now() });
+    const ttl = result.success ? SUCCESS_CACHE_TTL_MS : FAILURE_CACHE_TTL_MS;
+    responseCache.set(key, { result, timestamp: Date.now(), ttl });
+    enforceCacheCapacity();
 }
+
+function enforceCacheCapacity(): void {
+    while (responseCache.size > MAX_CACHE_ENTRIES) {
+        const oldestKey = responseCache.keys().next().value;
+        if (oldestKey === undefined) {
+            break;
+        }
+        responseCache.delete(oldestKey);
+    }
+}
+
+type ProviderConfig = {
+    name: string;
+    fn: DirectProvider;
+    isConfigured: () => boolean;
+};
+
+const PROVIDER_SEQUENCE: ProviderConfig[] = [
+    { name: "OpenRouter", fn: callOpenRouter, isConfigured: () => !!readEnv("OPENROUTER_API_KEY") },
+    { name: "OpenAI", fn: callOpenAI, isConfigured: () => !!readEnv("OPENAI_API_KEY") },
+    { name: "Anthropic", fn: callAnthropic, isConfigured: () => !!readEnv("ANTHROPIC_API_KEY") },
+];
 
 export function isLocalMode(): boolean {
     const localMode = readEnv("REASONSUITE_LOCAL_MODE") ?? readEnv("LOCAL_MODE");
@@ -267,11 +307,22 @@ export async function directLLMSample(prompt: string, maxTokens: number): Promis
         return cachedResult;
     }
 
-    const providers = [
-        { name: "OpenRouter", fn: callOpenRouter },
-        { name: "OpenAI", fn: callOpenAI },
-        { name: "Anthropic", fn: callAnthropic },
-    ];
+    const providers = PROVIDER_SEQUENCE.filter((provider) => {
+        try {
+            return provider.isConfigured();
+        } catch {
+            return false;
+        }
+    });
+
+    if (providers.length === 0) {
+        const failureResult: DirectSampleResult = {
+            success: false,
+            reason: "No external LLM providers are configured."
+        };
+        setCacheResult(prompt, maxTokens, failureResult);
+        return failureResult;
+    }
 
     const errors: string[] = [];
 
@@ -282,7 +333,7 @@ export async function directLLMSample(prompt: string, maxTokens: number): Promis
                 success: true,
                 raw: result.raw,
                 provider: result.provider,
-                warnings: []
+                warnings: [...errors]
             };
 
             // Cache successful result
@@ -299,7 +350,6 @@ export async function directLLMSample(prompt: string, maxTokens: number): Promis
         reason: `All providers failed: ${errors.join("; ")}`
     };
 
-    // Cache failure result too (with shorter TTL)
     setCacheResult(prompt, maxTokens, failureResult);
     return failureResult;
 }
@@ -320,7 +370,7 @@ export function getCacheStats(): { size: number; maxAge: number; ttl: number } {
     return {
         size: responseCache.size,
         maxAge: responseCache.size > 0 ? now - oldestTimestamp : 0,
-        ttl: CACHE_TTL
+        ttl: SUCCESS_CACHE_TTL_MS
     };
 }
 

@@ -22,14 +22,87 @@ const ModeSchema = z.enum([
     "exec",
 ]);
 
-const StepSchema = z.object({
-    mode: z
-        .union([ModeSchema, z.literal("razors")])
-        .transform((value) => (value === "razors" ? "razors.apply" : value))
-        .pipe(ModeSchema),
+const MODE_ALIASES: Partial<Record<string, z.infer<typeof ModeSchema>>> = {
+    razors: "razors.apply",
+    razor: "razors.apply",
+};
+
+const TOOL_TO_MODE: Partial<Record<string, z.infer<typeof ModeSchema>>> = {
+    "socratic.inquire": "socratic",
+    "abductive.hypothesize": "abductive",
+    "razors.apply": "razors.apply",
+    "reasoning.divergent_convergent": "divergent",
+    "systems.map": "systems",
+    "analogical.map": "analogical",
+    "constraint.solve": "constraint",
+    "redblue.challenge": "redblue",
+    "reasoning.scientific": "scientific",
+    "reasoning.self_explain": "self_explain",
+    "exec.run": "exec",
+};
+
+const MODE_KEYWORD_RULES: Array<{ pattern: RegExp; mode: z.infer<typeof ModeSchema> }> = [
+    { pattern: /(clarify|scope|question|probe)/i, mode: "socratic" },
+    { pattern: /(hypoth|explanation|diagnos|root cause|test explanations)/i, mode: "abductive" },
+    { pattern: /(prune|refine|razor|screen|evaluate|critique)/i, mode: "razors.apply" },
+    { pattern: /(brainstorm|generate|diverge|ideat|option)/i, mode: "divergent" },
+    { pattern: /(system|feedback|loop|leverage|stock|flow)/i, mode: "systems" },
+    { pattern: /(analogy|analog|map structure)/i, mode: "analogical" },
+    { pattern: /(constraint|optimi[sz]|feasible|schedule|budget|limit)/i, mode: "constraint" },
+    { pattern: /(risk|threat|challenge|red team|attack)/i, mode: "redblue" },
+    { pattern: /(experiment|scientific|test plan|measure)/i, mode: "scientific" },
+    { pattern: /(explain|self[-_ ]?explain|rationale|critique)/i, mode: "self_explain" },
+    { pattern: /(code|execute|compute|script|run)/i, mode: "exec" },
+];
+
+function determineMode(value: string, tool?: string): z.infer<typeof ModeSchema> {
+    const normalizedValue = value.trim().toLowerCase();
+    if (normalizedValue.length === 0) {
+        const fromTool = tool ? TOOL_TO_MODE[tool.toLowerCase()] : undefined;
+        return (fromTool ?? normalizedValue) as z.infer<typeof ModeSchema>;
+    }
+
+    const directAlias = MODE_ALIASES[normalizedValue];
+    if (directAlias) {
+        return directAlias;
+    }
+
+    if (tool) {
+        const fromTool = TOOL_TO_MODE[tool.toLowerCase()];
+        if (fromTool) {
+            return fromTool;
+        }
+    }
+
+    for (const { pattern, mode } of MODE_KEYWORD_RULES) {
+        if (pattern.test(value)) {
+            return mode;
+        }
+    }
+
+    const firstWord = normalizedValue.split(/\s+/)[0] ?? normalizedValue;
+    const aliasByFirstWord = MODE_ALIASES[firstWord];
+    if (aliasByFirstWord) {
+        return aliasByFirstWord;
+    }
+
+    return normalizedValue as z.infer<typeof ModeSchema>;
+}
+
+const StepBaseSchema = z.object({
+    mode: z.string(),
     tool: z.string().optional(),
     why: z.string(),
     args: z.record(z.string(), z.unknown()).default({}),
+});
+
+const StepSchema = StepBaseSchema.transform((step) => {
+    const mode = ModeSchema.parse(determineMode(step.mode, step.tool));
+    return {
+        ...step,
+        mode,
+        args: step.args ?? {},
+    };
 });
 
 const PlanSchema = z
@@ -181,7 +254,7 @@ function detectSignals(task: string, context: string | undefined): RouterSignals
         needsHypotheses: contains(/diagnos|root cause|why|uncertain|hypothesis|investigat|anomal/),
         needsCreative: contains(/brainstorm|idea|innov|option|alternativ|explore/),
         needsSystems: contains(/system|feedback|loop|dynamics|ecosystem|supply|demand|stock|flow/),
-        needsConstraint: contains(/constraint|optimi[sz]e|allocate|schedule|budget|limit|maximize|minimize|>=|<=|\b\d+/),
+        needsConstraint: contains(/constraint|optimi[sz]e|allocate|schedule|budget|limit|maximize|minimize|>=|<=/),
         needsRisk: contains(/risk|safety|security|privacy|abuse|attack|hazard|failure|compliance|bias/),
         contested: contains(/trade-?off|controvers|policy|ethic|disagree|stakeholder|debate/),
         wantsAnalogy: contains(/analogy|analog|similar to|compare|precedent|case study/),
@@ -198,13 +271,76 @@ function summarizeSignals(signals: RouterSignals): string[] {
         .map(([key]) => SIGNAL_DESCRIPTIONS[key]);
 }
 
+export const __routerTestUtils = {
+    determineMode,
+};
+
 function buildHeuristicPlan(task: string, context: string | undefined, maxSteps: number): RouterPlan {
     const signals = detectSignals(task, context);
     const steps: RouterStep[] = [];
+    const notes: string[] = [];
+    const omissions: string[] = [];
 
-    const push = (step: RouterStep) => {
-        if (steps.length >= maxSteps) return;
+    const push = (step: RouterStep, note?: string): boolean => {
+        if (steps.length >= maxSteps) {
+            if (note) {
+                omissions.push(`${note} (omitted due to ${maxSteps}-step cap).`);
+            }
+            return false;
+        }
         steps.push(step);
+        if (note) {
+            notes.push(note);
+        }
+        return true;
+    };
+
+    const ensureRazorPlacement = () => {
+        const generatorIndex = steps.findIndex((step) => step.mode === "abductive" || step.mode === "divergent");
+        if (generatorIndex === -1) {
+            return;
+        }
+
+        const existingIndex = steps.findIndex((step) => step.mode === "razors.apply");
+        const razorStep: RouterStep = {
+            mode: "razors.apply",
+            tool: "razors.apply",
+            why: "Prune or revise options using MDL, Bayesian Occam, Sagan, Hitchens, Hanlon, and Popper tests",
+            args: { razors: [...DEFAULT_RAZORS] },
+        };
+
+        const insertIndex = Math.min(generatorIndex + 1, steps.length);
+
+        if (existingIndex !== -1) {
+            if (existingIndex === insertIndex) {
+                return;
+            }
+            const [existing] = steps.splice(existingIndex, 1);
+            steps.splice(Math.min(insertIndex, steps.length), 0, existing);
+            return;
+        }
+
+        if (steps.length < maxSteps) {
+            steps.splice(insertIndex, 0, razorStep);
+            return;
+        }
+
+        // At capacity: drop the least critical non-generator step to make room
+        let removableIndex = -1;
+        for (let i = steps.length - 1; i >= 0; i--) {
+            const candidateMode = steps[i].mode;
+            if (candidateMode !== "socratic" && candidateMode !== "abductive" && candidateMode !== "divergent") {
+                removableIndex = i;
+                break;
+            }
+        }
+
+        if (removableIndex === -1) {
+            return;
+        }
+
+        steps.splice(removableIndex, 1);
+        steps.splice(Math.min(insertIndex, steps.length), 0, razorStep);
     };
 
     push({
@@ -259,6 +395,46 @@ function buildHeuristicPlan(task: string, context: string | undefined, maxSteps:
         });
     }
 
+    if (signals.needsRisk) {
+        const omissionMessage = "Scheduled redblue.challenge for risk review";
+        const riskStep: RouterStep = {
+            mode: "redblue",
+            tool: "redblue.challenge",
+            why: "Stress-test for failure modes and mitigations before deployment",
+            args: { rounds: Math.min(3, Math.max(1, maxSteps - steps.length || 1)), focus: ["safety", "security", "bias"] },
+        };
+
+        let inserted = push(riskStep, omissionMessage);
+        if (!inserted) {
+            const droppableModes = new Set<RouterStep["mode"]>([
+                "scientific",
+                "analogical",
+                "exec",
+                "self_explain",
+                "divergent",
+            ]);
+            const replaceEntry = steps
+                .map((step, idx) => ({ step, idx }))
+                .reverse()
+                .find(({ step }) => droppableModes.has(step.mode));
+
+            if (replaceEntry) {
+                const { step, idx } = replaceEntry;
+                steps.splice(idx, 1, riskStep);
+                notes.push(`Replaced ${step.mode} with redblue.challenge to honor risk signal.`);
+                const omissionIndex = omissions.indexOf(`${omissionMessage} (omitted due to ${maxSteps}-step cap).`);
+                if (omissionIndex !== -1) {
+                    omissions.splice(omissionIndex, 1);
+                }
+                inserted = true;
+            }
+        }
+
+        if (!inserted) {
+            omissions.push("Risk review flagged but redblue.challenge could not be scheduled; queue it manually.");
+        }
+    }
+
     if (signals.needsScientific) {
         push({
             mode: "scientific",
@@ -266,6 +442,9 @@ function buildHeuristicPlan(task: string, context: string | undefined, maxSteps:
             why: "Design falsifiable tests and evidence checks",
             args: { allow_tools: true },
         });
+        if (!steps.some((step) => step.mode === "scientific")) {
+            notes.push("Experiment signal detected but reasoning.scientific was skipped due to step limit.");
+        }
     }
 
     if (signals.codeOrCalc) {
@@ -295,24 +474,7 @@ function buildHeuristicPlan(task: string, context: string | undefined, maxSteps:
         });
     }
 
-    if (signals.needsRisk) {
-        push({
-            mode: "redblue",
-            tool: "redblue.challenge",
-            why: "Stress-test for failure modes and mitigations before deployment",
-            args: { rounds: Math.min(3, Math.max(1, maxSteps - steps.length || 1)), focus: ["safety", "security", "bias"] },
-        });
-    }
-
-    const generatorUsed = steps.some((step) => step.mode === "abductive" || step.mode === "divergent");
-    if (generatorUsed) {
-        push({
-            mode: "razors.apply",
-            tool: "razors.apply",
-            why: "Prune or revise options using MDL, Bayesian Occam, Sagan, Hitchens, Hanlon, and Popper tests",
-            args: { razors: [...DEFAULT_RAZORS] },
-        });
-    }
+    ensureRazorPlacement();
 
     if (!steps.some((step) => step.mode === "dialectic") && signals.contested && steps.length < maxSteps) {
         push({
@@ -373,12 +535,15 @@ function buildHeuristicPlan(task: string, context: string | undefined, maxSteps:
     }
 
     const triggered = summarizeSignals(signals);
+    const summaryNote =
+        triggered.length > 0
+            ? `Heuristic fallback triggered: ${triggered.join("; ")}.`
+            : "Heuristic fallback generated from keyword analysis; rerun with sampling for nuance.";
+
+    const allNotes = [summaryNote, ...notes, ...omissions];
 
     return {
         steps,
-        notes:
-            triggered.length > 0
-                ? `Heuristic fallback triggered: ${triggered.join("; ")}.`
-                : "Heuristic fallback generated from keyword analysis; rerun with sampling for nuance.",
+        notes: allNotes.filter(Boolean).join(" "),
     };
 }

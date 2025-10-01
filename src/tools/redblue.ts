@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { textResult, type ToolCallback } from "../lib/mcp.js";
+import { jsonResult, textResult, type ToolCallback } from "../lib/mcp.js";
 import { STRICT_JSON_REMINDER } from "../lib/prompt.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
@@ -50,8 +50,11 @@ const OutputSchema = z
 export function registerRedBlue(server: McpServer): void {
     const handler: ToolCallback<any> = async (rawArgs, _extra) => {
         // Validate and apply defaults to input arguments
-        const validatedArgs = InputSchema.parse(rawArgs);
-        const { proposal, rounds = 2, focus = ["safety", "bias", "hallucination", "security", "privacy"] } = validatedArgs;
+        const parsed = InputSchema.safeParse(rawArgs);
+        if (!parsed.success) {
+            return jsonResult({ error: "Invalid arguments for redblue.challenge", issues: parsed.error.issues });
+        }
+        const { proposal, rounds = 2, focus = ["safety", "bias", "hallucination", "security", "privacy"] } = parsed.data;
         const prompt = `Conduct ${rounds} rounds of Red vs Blue adversarial analysis on:
 ${proposal}
 

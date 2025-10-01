@@ -310,12 +310,12 @@ export function buildFallback(
     );
 
     const hypotheses = detect(
-        /diagnos|root cause|why|hypothes|investigat|anomal|myster|interpret/,
+        /diagnos|root cause|why\b|hypothes|investigat|anomal|myster|interpret|debug|incident|outage|latenc|slow(?:down)?|failure|fault|bug|spike|error(?:\s|-)?rate|post[-\s]?mortem|alert|degrad/,
         () => {
             addReason("abductive", "Diagnosis/root-cause language", 0.4);
-            addReason("razors.apply", "Hypotheses benefit from razor screening", 0.22);
+            addReason("razors.apply", "Hypotheses benefit from razor screening", 0.2);
         },
-        "Found diagnosis/root-cause cues",
+        "Detected incident/diagnosis cues (debug/latency/error/etc.)",
         "Points to abductive hypothesis ranking and razor screening"
     );
 

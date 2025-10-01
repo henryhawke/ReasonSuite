@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { textResult, type ToolCallback } from "../lib/mcp.js";
+import { jsonResult, textResult, type ToolCallback } from "../lib/mcp.js";
 import { STRICT_JSON_REMINDER } from "../lib/prompt.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
@@ -30,8 +30,11 @@ const OutputSchema = z
 export function registerSystems(server: McpServer): void {
     const handler: ToolCallback<any> = async (rawArgs, _extra) => {
         // Validate and apply defaults to input arguments
-        const validatedArgs = InputSchema.parse(rawArgs);
-        const { variables = [], context } = validatedArgs;
+        const parsed = InputSchema.safeParse(rawArgs);
+        if (!parsed.success) {
+            return jsonResult({ error: "Invalid arguments for systems.map", issues: parsed.error.issues });
+        }
+        const { variables = [], context } = parsed.data;
         const prompt = `Build a concise causal loop diagram (CLD) for the system below.
 Variables: ${variables.join(", ") || "(discover reasonable variables)"}
 Context: ${context ?? ""}

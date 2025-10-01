@@ -11,3 +11,4 @@ package-lock.json
 CLAUDE.md
 package-lock.json
 .env
+dist/tools

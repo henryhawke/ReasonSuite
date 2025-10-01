@@ -49,26 +49,41 @@ function attachMeta<T>(payload: T, meta: ReasoningMetadata): T {
 
 function buildCandidates(raw: string): string[] {
     const trimmed = raw.trim();
+    const MAX_CANDIDATE_LENGTH = 50_000;
+    const MAX_CANDIDATE_COUNT = 6;
     const candidates = new Set<string>();
     if (!trimmed) {
         return [];
     }
-    candidates.add(trimmed);
+    if (trimmed.length <= MAX_CANDIDATE_LENGTH) {
+        candidates.add(trimmed);
+    }
     const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(trimmed);
     if (fenced?.[1]) {
-        candidates.add(fenced[1].trim());
+        const candidate = fenced[1].trim();
+        if (candidate.length <= MAX_CANDIDATE_LENGTH) {
+            candidates.add(candidate);
+        }
     }
     const firstBrace = trimmed.indexOf("{");
     const lastBrace = trimmed.lastIndexOf("}");
     if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-        candidates.add(trimmed.slice(firstBrace, lastBrace + 1).trim());
+        const braceCandidate = trimmed.slice(firstBrace, lastBrace + 1).trim();
+        if (braceCandidate.length <= MAX_CANDIDATE_LENGTH) {
+            candidates.add(braceCandidate);
+        }
     }
     const firstBracket = trimmed.indexOf("[");
     const lastBracket = trimmed.lastIndexOf("]");
     if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
-        candidates.add(trimmed.slice(firstBracket, lastBracket + 1).trim());
+        const bracketCandidate = trimmed.slice(firstBracket, lastBracket + 1).trim();
+        if (bracketCandidate.length <= MAX_CANDIDATE_LENGTH) {
+            candidates.add(bracketCandidate);
+        }
     }
-    return Array.from(candidates.values()).filter((candidate) => candidate.length > 0);
+    return Array.from(candidates.values())
+        .filter((candidate) => candidate.length > 0)
+        .slice(0, MAX_CANDIDATE_COUNT);
 }
 
 function tryParse(candidate: string) {

@@ -61,21 +61,80 @@ Return only that JSON object.`;
                 prompt,
                 maxTokens: 700,
                 schema: OutputSchema,
-                fallback: () => ({
-                    results: [
-                        {
-                            id: "candidate-1",
-                            keep_or_drop: "keep" as const,
-                            reasons: [
-                                "Simplest explanation consistent with MDL",
-                                "Survives Popper falsifiability",
-                            ],
-                            risk_notes: "Monitor for new contradictory evidence",
-                        },
-                    ],
-                    shortlist: ["candidate-1"],
-                    notes: "Deterministic heuristic analysis; validate candidates_json structure.",
-                }),
+                fallback: () => {
+                    type CandidateShape = { id?: string; title?: string; name?: string } & Record<string, unknown>;
+                    const tryParseCandidates = (): CandidateShape[] => {
+                        try {
+                            const parsed = JSON.parse(candidates_json ?? "null");
+                            if (Array.isArray(parsed)) {
+                                return parsed as CandidateShape[];
+                            }
+                            if (parsed && typeof parsed === "object") {
+                                if (Array.isArray((parsed as any).candidates)) {
+                                    return (parsed as any).candidates as CandidateShape[];
+                                }
+                                return Object.values(parsed as Record<string, CandidateShape>).filter(
+                                    (value): value is CandidateShape => value && typeof value === "object"
+                                );
+                            }
+                        } catch {
+                            // Ignore parse failures; fallback will synthesize candidates.
+                        }
+                        return [];
+                    };
+
+                    const parsedCandidates = tryParseCandidates();
+                    const candidateCount = parsedCandidates.length || 1;
+                    const primaryRazor = razors?.[0] ?? "MDL";
+                    const secondaryRazor = razors?.[1] ?? "Popper";
+
+                    const normalized = (parsedCandidates.length ? parsedCandidates : [{ id: "candidate-1" }]).map(
+                        (candidate, idx) => {
+                            const id = typeof candidate.id === "string" && candidate.id.trim().length
+                                ? candidate.id.trim()
+                                : typeof candidate.title === "string" && candidate.title.trim().length
+                                    ? candidate.title.trim()
+                                    : typeof candidate.name === "string" && candidate.name.trim().length
+                                        ? candidate.name.trim()
+                                        : `candidate-${idx + 1}`;
+                            const keep = idx === 0;
+                            const keepOrDrop: "keep" | "drop" | "revise" = keep ? "keep" : idx === 1 ? "revise" : "drop";
+                            const reasons = keep
+                                ? [
+                                      `Passes ${primaryRazor} screening with minimal added complexity.`,
+                                      `Still testable under ${secondaryRazor} falsifiability.`,
+                                  ]
+                                : [
+                                      `Requires refinement to satisfy ${primaryRazor} simplicity expectations.`,
+                                      `Provide experiments to satisfy ${secondaryRazor} scepticism.`,
+                                  ];
+                            const riskNotes = keep
+                                ? `Monitor for regressions and gather evidence to keep ${primaryRazor} satisfied.`
+                                : `Address weaknesses highlighted by ${primaryRazor} before promoting this option.`;
+
+                            return {
+                                id,
+                                keep_or_drop: keepOrDrop,
+                                reasons,
+                                risk_notes: riskNotes,
+                            };
+                        }
+                    );
+
+                    const shortlist = normalized
+                        .filter((entry) => entry.keep_or_drop === "keep" || entry.keep_or_drop === "revise")
+                        .map((entry) => entry.id);
+
+                    if (shortlist.length === 0 && normalized.length > 0) {
+                        shortlist.push(normalized[0].id);
+                    }
+
+                    return {
+                        results: normalized,
+                        shortlist,
+                        notes: `Deterministic heuristic analysis; evaluated ${candidateCount} candidate(s) with ${razors.join(", ") || "default"} razors.`,
+                    };
+                },
             });
             return jsonResult(data);
         } catch (error: any) {
