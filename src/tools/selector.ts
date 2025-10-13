@@ -1,8 +1,8 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { textResult, type ToolCallback } from "../lib/mcp.js";
+import { jsonResult, textResult, type ToolCallback } from "../lib/mcp.js";
 import { DEFAULT_RAZORS, RAZOR_DESCRIPTIONS } from "../lib/razors.js";
-import { STRICT_JSON_REMINDER } from "../lib/prompt.js";
+import { buildStructuredPrompt } from "../lib/prompt.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 import type { ReasoningMode } from "../lib/types.js";
 
@@ -533,17 +533,41 @@ export function rankRazorsFallback(opts: {
 
 export function registerSelector(server: McpServer): void {
     const handler: ToolCallback<any> = async (rawArgs, _extra) => {
-        const { request, context, candidate_modes, candidate_razors } = rawArgs as InputArgs;
+        const parsed = InputSchema.safeParse(rawArgs);
+        if (!parsed.success) {
+            return jsonResult({ error: "Invalid arguments for reasoning.selector", issues: parsed.error.issues });
+        }
+        const { request, context, candidate_modes, candidate_razors } = parsed.data;
         const modes = (candidate_modes?.length ? candidate_modes : [...MODE_IDS]).filter(isModeId);
         const normalizedModes = modes.length ? modes : [...MODE_IDS];
         const razorList = candidate_razors?.length ? candidate_razors : [...DEFAULT_RAZORS];
 
-        const prompt = `You are the ReasonSuite meta-selector. Analyze the user's request and recommend the single best reasoning mode to run next plus the razors to stack afterwards. Work through the cues explicitly and keep the output JSON strict.\n\nRequest: ${request}\nContext: ${context ?? "(none)"}\n\nCandidate thinking modes:\n${renderModeCatalog(normalizedModes)}\n\nCandidate razors:\n${renderRazorCatalog(razorList)}\n\nDeliberation instructions:\n1. Extract the salient signals or keywords from the request/context.\n2. Score each candidate mode between 0 and 1 using those signals.\n3. Pick the highest-utility primary_mode (prefer modes over razors unless the request explicitly centers razors).\n4. List up to three supporting modes with short justifications.\n5. Recommend up to four razors in the order they should be applied, or none if irrelevant.\n6. Document your reasoning steps as observation/implication pairs in decision_path.\n\n${STRICT_JSON_REMINDER}\n\nJSON schema to emit:\n{\n  "primary_mode": {"id":"mode id","label":"human label","confidence":0.0-1.0,"reason":"summary"},\n  "supporting_modes": [{"id":"...","label":"...","score":0.0-1.0,"reason":"..."}],\n  "razor_stack": [{"id":"...","label":"...","score":0.0-1.0,"reason":"..."}],\n  "decision_path": [{"observation":"...","implication":"..."}],\n  "next_action": "optional guidance",\n  "notes": "optional caveats"\n}\nReturn only that JSON object.`;
+        const prompt = buildStructuredPrompt({
+            mode: "Mode selector",
+            objective: "Recommend the best reasoning mode to run next plus follow-up razors.",
+            inputs: { request, context: context ?? "(none)" },
+            steps: [
+                "Extract salient signals or keywords from request/context.",
+                "Score each candidate mode 0-1 using those signals.",
+                "Pick the highest-utility primary_mode (prefer modes unless request centers razors).",
+                "List up to three supporting modes with short reasons.",
+                "Recommend up to four razors in order or none if irrelevant.",
+                "Document reasoning steps as observation→implication pairs in decision_path.",
+            ],
+            extras: [
+                "Candidate thinking modes:",
+                renderModeCatalog(normalizedModes),
+                "Candidate razors:",
+                renderRazorCatalog(razorList),
+            ],
+            schema:
+                '{"primary_mode":{"id":"","label":"","confidence":0,"reason":""},"supporting_modes":[{"id":"","label":"","score":0,"reason":""}],"razor_stack":[{"id":"","label":"","score":0,"reason":""}],"decision_path":[{"observation":"","implication":""}],"next_action":"","notes":""}',
+        });
 
         const { text } = await sampleStructuredJson({
             server,
             prompt,
-            maxTokens: 750,
+            maxTokens: 620,
             schema: OutputSchema,
             fallback: () => buildFallback(request, context, normalizedModes, razorList),
         });

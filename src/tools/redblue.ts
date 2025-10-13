@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { jsonResult, textResult, type ToolCallback } from "../lib/mcp.js";
-import { STRICT_JSON_REMINDER } from "../lib/prompt.js";
+import { buildStructuredPrompt } from "../lib/prompt.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
 const InputSchema = z.object({
@@ -55,44 +55,24 @@ export function registerRedBlue(server: McpServer): void {
             return jsonResult({ error: "Invalid arguments for redblue.challenge", issues: parsed.error.issues });
         }
         const { proposal, rounds = 2, focus = ["safety", "bias", "hallucination", "security", "privacy"] } = parsed.data;
-        const prompt = `Conduct ${rounds} rounds of Red vs Blue adversarial analysis on:
-${proposal}
-
-Focus areas: ${focus.join(", ")}.
-
-For each round:
-1. Red Team: Identify the most critical attack vector or failure mode
-2. Blue Team: Provide defense strategy and specific mitigations
-3. Aggregate all defects found with severity and evidence
-4. Create risk matrix categorizing issues as low/medium/high
-5. Provide actionable final guidance
-
-${STRICT_JSON_REMINDER}
-
-JSON schema to emit:
-{
-  "rounds": [
-    {
-      "n": 1,
-      "red": {"attack": "..."},
-      "blue": {"defense": "...", "mitigations": ["..."]}
-    }
-  ],
-  "defects": [
-    {"type": "...", "severity": "low|med|high", "evidence": "..."}
-  ],
-  "risk_matrix": {
-    "low": [],
-    "medium": [],
-    "high": []
-  },
-  "final_guidance": ["..."]
-}
-Return only valid JSON matching this exact schema.`;
+        const prompt = buildStructuredPrompt({
+            mode: "Red vs Blue",
+            objective: `Run ${rounds} adversarial rounds on the proposal and synthesize risks.`,
+            inputs: { proposal, focus: focus.join(", ") },
+            steps: [
+                "Red: state the most critical attack vector or failure mode per round.",
+                "Blue: describe defense strategy and mitigations.",
+                "Aggregate defects with type, severity (low|med|high), evidence.",
+                "Summarize risk_matrix buckets (low/medium/high).",
+                "Provide actionable final_guidance.",
+            ],
+            schema:
+                '{"rounds":[{"n":1,"red":{"attack":""},"blue":{"defense":"","mitigations":[]}}],"defects":[{"type":"","severity":"low","evidence":""}],"risk_matrix":{"low":[],"medium":[],"high":[]},"final_guidance":[]}',
+        });
         const { text } = await sampleStructuredJson({
             server,
             prompt,
-            maxTokens: 2500,
+            maxTokens: 1200,
             schema: OutputSchema,
             fallback: () => ({
                 rounds: Array.from({ length: rounds || 2 }, (_, idx) => ({

@@ -137,7 +137,11 @@ function runInSandbox(code: string, timeoutMs: number): ExecResult {
 
 export function registerExec(server: McpServer): void {
     const handler: ToolCallback<any> = async (rawArgs, _extra) => {
-        const { code, timeout_ms } = rawArgs as InputArgs;
+        const parsed = InputSchema.safeParse(rawArgs);
+        if (!parsed.success) {
+            return jsonResult({ error: "Invalid arguments for exec.run", issues: parsed.error.issues });
+        }
+        const { code, timeout_ms } = parsed.data;
         const result = runInSandbox(code, timeout_ms);
         const payload: ExecResult = {
             stdout: result.stdout,

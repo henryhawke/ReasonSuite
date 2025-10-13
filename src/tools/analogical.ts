@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { textResult, type ToolCallback } from "../lib/mcp.js";
-import { STRICT_JSON_REMINDER } from "../lib/prompt.js";
+import { jsonResult, textResult, type ToolCallback } from "../lib/mcp.js";
+import { buildStructuredPrompt } from "../lib/prompt.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
 const InputSchema = z.object({
@@ -35,34 +35,28 @@ const OutputSchema = z
 
 export function registerAnalogical(server: McpServer): void {
     const handler: ToolCallback<any> = async (rawArgs, _extra) => {
-        const { source_domain, target_problem, constraints } = rawArgs as InputArgs;
-        const prompt = `Build a structural analogy from SOURCE to TARGET.
-
-SOURCE: ${source_domain}
-TARGET: ${target_problem}
-CONSTRAINTS: ${constraints ?? ""}
-
-Deliberation steps:
-1. Identify the core actors, relationships, and dynamics in the source domain.
-2. Map each relevant source element to the best target counterpart with justification.
-3. List structural relations that transfer cleanly and flag mismatches or missing components.
-4. Summarise transferable_insights and failure_modes the target should monitor.
-
-${STRICT_JSON_REMINDER}
-
-JSON schema to emit:
-{
- "mapping":[{"source":"...","target":"...","justification":"..."}],
- "shared_relations":["..."],
- "mismatches":["..."],
- "transferable_insights":["..."],
- "failure_modes":["..."]
-}
-Return only that JSON object.`;
+        const parsed = InputSchema.safeParse(rawArgs);
+        if (!parsed.success) {
+            return jsonResult({ error: "Invalid arguments for analogical.map", issues: parsed.error.issues });
+        }
+        const { source_domain, target_problem, constraints } = parsed.data;
+        const prompt = buildStructuredPrompt({
+            mode: "Analogical",
+            objective: "Transfer structure from source domain to target problem while flagging mismatches.",
+            inputs: { source_domain, target_problem, constraints },
+            steps: [
+                "Extract core actors, relationships, dynamics in source.",
+                "Map each relevant source element to a target counterpart with justification.",
+                "List structural relations that transfer cleanly and highlight mismatches.",
+                "Summarise transferable_insights and failure_modes to monitor.",
+            ],
+            schema:
+                '{"mapping":[{"source":"","target":"","justification":""}],"shared_relations":[],"mismatches":[],"transferable_insights":[],"failure_modes":[]}',
+        });
         const { text } = await sampleStructuredJson({
             server,
             prompt,
-            maxTokens: 900,
+            maxTokens: 420,
             schema: OutputSchema,
             fallback: () => ({
                 mapping: [

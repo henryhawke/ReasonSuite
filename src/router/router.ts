@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { textResult, type ToolCallback } from "../lib/mcp.js";
-import { STRICT_JSON_REMINDER } from "../lib/prompt.js";
+import { jsonResult, textResult, type ToolCallback } from "../lib/mcp.js";
+import { buildStructuredPrompt } from "../lib/prompt.js";
 import { DEFAULT_RAZORS } from "../lib/razors.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 import { buildFallback as selectorFallback } from "../tools/selector.js";
@@ -153,7 +153,11 @@ const SIGNAL_DESCRIPTIONS: Record<keyof RouterSignals, string> = {
 
 export function registerRouter(server: McpServer): void {
     const handler: ToolCallback<any> = async (rawArgs, _extra) => {
-        const { task, context, maxSteps } = rawArgs as InputArgs;
+        const parsed = InputSchema.safeParse(rawArgs);
+        if (!parsed.success) {
+            return jsonResult({ error: "Invalid arguments for reasoning.router.plan", issues: parsed.error.issues });
+        }
+        const { task, context, maxSteps } = parsed.data;
         const signals = detectSignals(task, context);
         const heuristicsList = summarizeSignals(signals);
         const heuristicsBlock = heuristicsList.length
@@ -175,47 +179,32 @@ export function registerRouter(server: McpServer): void {
             "exec.run — execute sandboxed JavaScript for quick calculations or prototypes",
         ].join("\n");
 
-        const prompt = `You are a planner and planning assistant that selects reasoning tools for an autonomous analyst.
-
-Mode quick reference (tool → cue):
-${modeReference}
-
-Heuristic signals detected for this request:
-${heuristicsBlock}
-
-Task: ${task}
-Context: ${context ?? "(none)"}
-
-Planning rules:
-- Limit the plan to ${maxSteps} steps.
-- Always begin with socratic.inquire unless the question is already fully specified.
-- Whenever you add abductive or divergent steps, schedule razors.apply immediately afterwards.
-- Insert redblue.challenge before final answers when risk, safety, or deployment concerns appear.
-- Provide short "why" rationales and populate args as JSON objects (use {} when no parameters are needed).
-- Use notes to flag limitations, dependencies, or follow-up actions in one sentence.
-
-Deliberation steps:
-1. Summarize the goal/context internally and check if socratic clarification is still needed.
-2. Evaluate each heuristic signal and decide which modes are essential within the ${maxSteps}-step cap.
-3. Sequence the modes so clarifying/creative steps precede evaluation, and verification/risk steps precede conclusions.
-4. Fill args with the minimal structured parameters each tool needs (e.g., depth for socratic, focus arrays for redblue).
-5. Confirm razors.apply follows any hypothesis/ideation generator and avoid duplicate modes unless justified.
-
-${STRICT_JSON_REMINDER}
-
-JSON schema to emit:
-{
-  "steps": [
-    {"mode":"...","tool":"tool.id","why":"...","args":{}}
-  ],
-  "notes": "one-line on expected limitations"
-}
-Return only that JSON object.`;
+        const prompt = buildStructuredPrompt({
+            mode: "Router planner",
+            objective: `Design a ${maxSteps}-step tool plan for the analyst.`,
+            inputs: { task, context: context ?? "(none)" },
+            steps: [
+                "Summarize goal/context internally and decide if socratic clarification is needed first.",
+                "Evaluate heuristic signals and choose essential modes within the step cap.",
+                "Sequence modes so clarify/creative precede evaluation and risk/verification precede conclusions.",
+                "Fill args with minimal structured parameters required per tool.",
+                "Ensure razors.apply follows hypothesis/ideation tools and avoid duplicates unless justified.",
+            ],
+            extras: [
+                "Mode quick reference (tool → cue):",
+                modeReference,
+                "Heuristic signals detected:",
+                heuristicsBlock,
+                "Planning rules:",
+                `- Limit the plan to ${maxSteps} steps.\n- Start with socratic.inquire unless scope is already clear.\n- Follow abductive/divergent with razors.apply.\n- Add redblue.challenge before final answers when risk appears.\n- Provide short \"why\" rationales and JSON args (use {} when empty).\n- Use notes for one-line limitations or follow-ups.`,
+            ],
+            schema: '{"steps":[{"mode":"","tool":"","why":"","args":{}}],"notes":""}',
+        });
 
         const { text } = await sampleStructuredJson({
             server,
             prompt,
-            maxTokens: 600,
+            maxTokens: 420,
             schema: PlanSchema,
             fallback: () => buildHeuristicPlan(task, context, maxSteps),
         });

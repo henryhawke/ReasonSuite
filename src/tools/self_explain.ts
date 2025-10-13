@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { textResult, type ToolCallback } from "../lib/mcp.js";
-import { STRICT_JSON_REMINDER } from "../lib/prompt.js";
+import { jsonResult, textResult, type ToolCallback } from "../lib/mcp.js";
+import { buildStructuredPrompt } from "../lib/prompt.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
 const InputSchema = z.object({
@@ -25,31 +25,30 @@ const OutputSchema = z
 
 export function registerSelfExplain(server: McpServer): void {
     const handler: ToolCallback<any> = async (rawArgs, _extra) => {
-        const { query, allow_citations } = rawArgs as InputArgs;
-        const prompt = `Transparent Self-Explanation.
-Query: ${query}
-Citations allowed? ${allow_citations ? "true" : "false"}
-
-Deliberation steps:
-1. Draft a numbered rationale that walks through the reasoning at a high level.
-2. Provide evidence entries linking each claim to a citation or note what would be retrieved if citations are disallowed.
-3. List self_critique items highlighting weaknesses, missing data, or assumptions.
-4. Offer a concise revision that incorporates the critiques.
-
-${STRICT_JSON_REMINDER}
-
-JSON schema to emit:
-{
-  "rationale": ["step1","step2"],
-  "evidence": [{"claim":"...","source":"url or doc id"}],
-  "self_critique": ["possible flaw"],
-  "revision": "final refined answer"
-}
-Return only that JSON object.`;
+        const parsed = InputSchema.safeParse(rawArgs);
+        if (!parsed.success) {
+            return jsonResult({ error: "Invalid arguments for reasoning.self_explain", issues: parsed.error.issues });
+        }
+        const { query, allow_citations } = parsed.data;
+        const prompt = buildStructuredPrompt({
+            mode: "Self-explanation",
+            objective: "Expose rationale, evidence, critique, and revision for the query.",
+            inputs: { query, allow_citations: allow_citations ? "true" : "false" },
+            steps: [
+                "Draft a numbered rationale covering the reasoning arc.",
+                allow_citations
+                    ? "Provide evidence entries with citation sources."
+                    : "Note where evidence would be retrieved since citations are disallowed.",
+                "List self_critique items covering weaknesses or assumptions.",
+                "Offer a concise revision incorporating the critiques.",
+            ],
+            schema:
+                '{"rationale":[],"evidence":[{"claim":"","source":""}],"self_critique":[],"revision":""}',
+        });
         const { text } = await sampleStructuredJson({
             server,
             prompt,
-            maxTokens: 900,
+            maxTokens: 420,
             schema: OutputSchema,
             fallback: () => ({
                 rationale: ["Restate question", "Identify governing principles"],
