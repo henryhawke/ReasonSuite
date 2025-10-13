@@ -1,6 +1,6 @@
 import type { McpServer, PromptCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { definePromptArgsShape, STRICT_JSON_REMINDER } from "../lib/prompt.js";
+import { definePromptArgsShape, STRICT_JSON_COMPACT } from "../lib/prompt.js";
 
 const ArgsSchema = z.object({
     topic: z.string(),
@@ -52,7 +52,7 @@ ${topic}
    Example: "Interview 5 users about their workflow" ✅
    Not: "Learn more" ❌
 
-${STRICT_JSON_REMINDER}
+${STRICT_JSON_COMPACT}
 
 **Output Schema:**
 {

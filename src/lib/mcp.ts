@@ -10,12 +10,13 @@ export function textResult(text: string): CallToolResult {
     return { content: [textContent(text)] };
 }
 
-export function jsonResult(value: unknown): CallToolResult {
+export function jsonResult(value: unknown, { pretty = false }: { pretty?: boolean } = {}): CallToolResult {
     if (typeof value === "string") {
         return textResult(value);
     }
     try {
-        return textResult(JSON.stringify(value, null, 2));
+        const spacing = pretty ? 2 : undefined;
+        return textResult(JSON.stringify(value, null, spacing));
     } catch (error) {
         return textResult(String(value));
     }

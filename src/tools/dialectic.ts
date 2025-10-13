@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { textResult, type ToolCallback } from "../lib/mcp.js";
-import { STRICT_JSON_REMINDER } from "../lib/prompt.js";
+import { jsonResult, textResult, type ToolCallback } from "../lib/mcp.js";
+import { buildStructuredPrompt } from "../lib/prompt.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
 const InputSchema = z.object({
@@ -31,32 +31,28 @@ const OutputSchema = z
 
 export function registerDialectic(server: McpServer): void {
     const handler: ToolCallback<any> = async (rawArgs, _extra) => {
-        const { claim, context, audience } = rawArgs as InputArgs;
-        const prompt = `Use a dialectical frame.
-Claim: ${claim}
-Context: ${context ?? ""}
-Audience: ${audience}
-
-Deliberation steps:
-1. Summarise the strongest thesis supporting the claim with concrete key_points.
-2. Develop the strongest antithesis highlighting counterarguments, missing evidence, or risks.
-3. Craft a synthesis that reconciles or updates the claim, including proposal, assumptions, tradeoffs, and evidence_needed.
-4. List remaining open_questions that must be addressed.
-
-${STRICT_JSON_REMINDER}
-
-JSON schema to emit:
-{
- "thesis": {"position": "...", "key_points": ["..."]},
- "antithesis": {"position": "...", "key_points": ["..."]},
-"synthesis": {"proposal": "...", "assumptions": ["..."], "tradeoffs": ["..."], "evidence_needed": ["..."]},
-"open_questions": ["..."]
-}
-Return only that JSON object.`;
+        const parsed = InputSchema.safeParse(rawArgs);
+        if (!parsed.success) {
+            return jsonResult({ error: "Invalid arguments for dialectic.tas", issues: parsed.error.issues });
+        }
+        const { claim, context, audience } = parsed.data;
+        const prompt = buildStructuredPrompt({
+            mode: "Dialectic",
+            objective: "Map the thesis, antithesis, and synthesis for the claim and audience.",
+            inputs: { claim, context, audience },
+            steps: [
+                "Thesis: strongest support plus concrete key_points.",
+                "Antithesis: strongest rebuttal, gaps, or risks.",
+                "Synthesis: reconciled proposal with assumptions, tradeoffs, evidence_needed.",
+                "Open_questions: remaining uncertainties to resolve.",
+            ],
+            schema:
+                '{"thesis":{"position":"","key_points":[]},"antithesis":{"position":"","key_points":[]},"synthesis":{"proposal":"","assumptions":[],"tradeoffs":[],"evidence_needed":[]},"open_questions":[]}',
+        });
         const { text } = await sampleStructuredJson({
             server,
             prompt,
-            maxTokens: 700,
+            maxTokens: 360,
             schema: OutputSchema,
             fallback: () => ({
                 thesis: {

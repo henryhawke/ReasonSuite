@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { textResult, type ToolCallback } from "../lib/mcp.js";
-import { STRICT_JSON_REMINDER } from "../lib/prompt.js";
+import { jsonResult, textResult, type ToolCallback } from "../lib/mcp.js";
+import { buildStructuredPrompt } from "../lib/prompt.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
 const InputSchema = z.object({
@@ -26,33 +26,28 @@ const OutputSchema = z
 
 export function registerSocratic(server: McpServer): void {
     const handler: ToolCallback<any> = async (rawArgs, _extra) => {
-        const { topic, context, depth } = rawArgs as InputArgs;
-        const prompt = `Produce a ${depth}-layer Socratic question tree for: "${topic}"
-Context: ${context ?? ""}
-
-Deliberation steps:
-1. For each layer from 1 to ${depth}, list probing questions that deepen understanding of the topic (layer 1 clarifies scope and definitions; deeper layers challenge assumptions and evidence).
-2. Summarise assumptions_to_test exposed by the questioning.
-3. Recommend evidence_to_collect.
-4. Suggest next_actions to close knowledge gaps.
-
-${STRICT_JSON_REMINDER}
-
-JSON schema to emit:
-{
- "layers": [
-   {"level": 1, "questions": ["..."]},
-   {"level": 2, "questions": ["..."]}
- ],
- "assumptions_to_test": ["..."],
- "evidence_to_collect": ["..."],
- "next_actions": ["..."]
-}
-Return only that JSON object.`;
+        const parsed = InputSchema.safeParse(rawArgs);
+        if (!parsed.success) {
+            return jsonResult({ error: "Invalid arguments for socratic.inquire", issues: parsed.error.issues });
+        }
+        const { topic, context, depth } = parsed.data;
+        const prompt = buildStructuredPrompt({
+            mode: "Socratic inquiry",
+            objective: `Build a ${depth}-layer question tree to clarify the topic and next steps.`,
+            inputs: { topic, context, depth: String(depth) },
+            steps: [
+                `For each layer 1…${depth}, list probing questions (layer 1 clarifies scope, deeper layers challenge assumptions/evidence).`,
+                "Summarise assumptions_to_test exposed by questioning.",
+                "Recommend evidence_to_collect.",
+                "Suggest next_actions to close knowledge gaps.",
+            ],
+            schema:
+                '{"layers":[{"level":1,"questions":[]}],"assumptions_to_test":[],"evidence_to_collect":[],"next_actions":[]}',
+        });
         const { text } = await sampleStructuredJson({
             server,
             prompt,
-            maxTokens: 600,
+            maxTokens: 360,
             schema: OutputSchema,
             fallback: () => {
                 const baseDepth = Math.min(Math.max(depth ?? 3, 1), 6);

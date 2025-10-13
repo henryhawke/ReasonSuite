@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { jsonResult, textResult, type ToolCallback } from "../lib/mcp.js";
-import { STRICT_JSON_REMINDER } from "../lib/prompt.js";
+import { buildStructuredPrompt } from "../lib/prompt.js";
 import { DEFAULT_RAZORS, summarizeRazors } from "../lib/razors.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
@@ -47,29 +47,21 @@ export function registerAbductive(server: McpServer): void {
             return jsonResult({ error: "Invalid arguments for abductive.hypothesize", issues: parsed.error.issues });
         }
         const { observations, k = 4, apply_razors = [...DEFAULT_RAZORS] } = parsed.data;
-        const prompt = `Observations:\n${observations}
-
-Deliberation steps:
-1. Extract pivotal clues or anomalies from the observations.
-2. Generate exactly ${k} labelled hypotheses (H1, H2, ...) that explain the evidence.
-3. For each hypothesis provide a concise statement, cite clues in the rationale, and assign 0-1 scores for prior_plausibility, explanatory_power, simplicity_penalty (penalise complexity), and testability.
-4. Compute overall = prior_plausibility + explanatory_power + testability - simplicity_penalty (round to two decimals).
-5. Recommend discriminating experiments_or_evidence and capture residual caveats in notes.
-
-Apply the following razors and reference them explicitly where relevant:
-${summarizeRazors(apply_razors)}
-
-${STRICT_JSON_REMINDER}
-
-JSON schema to emit:
-{
- "hypotheses": [
-  {"id":"H1","statement":"...","rationale":"...", "scores":{"prior_plausibility":0.6,"explanatory_power":0.7,"simplicity_penalty":0.2,"testability":0.6,"overall":1.7}}
- ],
- "experiments_or_evidence": ["test1"],
- "notes": "..."
-}
-Return only that JSON object.`;
+        const prompt = buildStructuredPrompt({
+            mode: "Abductive",
+            objective: `Rank ${k} hypotheses that best explain the observations with razor checks.`,
+            inputs: { observations },
+            steps: [
+                "Extract pivotal clues or anomalies.",
+                `Generate exactly ${k} labelled hypotheses (H1…H${k}).`,
+                "For each: give statement, cite clues, score prior_plausibility, explanatory_power, simplicity_penalty, testability.",
+                "Compute overall = prior + explanatory + testability − simplicity_penalty (2 decimals).",
+                "List discriminating experiments_or_evidence and residual notes.",
+            ],
+            extras: [`Apply razors in reasoning: ${summarizeRazors(apply_razors)}`],
+            schema:
+                '{"hypotheses":[{"id":"H1","statement":"","rationale":"","scores":{"prior_plausibility":0,"explanatory_power":0,"simplicity_penalty":0,"testability":0,"overall":0}}],"experiments_or_evidence":[],"notes":""}',
+        });
         const buildFallback = () => {
             const desired = Math.min(Math.max(k ?? 4, 2), 10);
             const tokens = (observations ?? "")
@@ -151,7 +143,7 @@ Return only that JSON object.`;
         const { text, data, usedFallback } = await sampleStructuredJson({
             server,
             prompt,
-            maxTokens: 900,
+            maxTokens: 540,
             schema: OutputSchema,
             fallback: buildFallback,
         });
@@ -166,9 +158,13 @@ Return only that JSON object.`;
                     source: "fallback" as const,
                     warnings: mergedWarnings,
                     raw: data.meta?.raw,
+                    prompt_chars: data.meta?.prompt_chars,
+                    prompt_tokens_estimate: data.meta?.prompt_tokens_estimate,
+                    response_chars: data.meta?.response_chars,
+                    response_tokens_estimate: data.meta?.response_tokens_estimate,
                 },
             };
-            return textResult(JSON.stringify(payload, null, 2));
+            return textResult(JSON.stringify(payload));
         }
         return textResult(text);
     };

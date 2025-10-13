@@ -16,6 +16,10 @@ export const ReasoningMetadataSchema = z.object({
     source: z.enum(["model", "fallback"]),
     warnings: z.array(z.string()).default([]),
     raw: z.string().optional(),
+    prompt_chars: z.number().optional(),
+    prompt_tokens_estimate: z.number().optional(),
+    response_chars: z.number().optional(),
+    response_tokens_estimate: z.number().optional(),
 });
 
 type ReasoningMetadata = z.infer<typeof ReasoningMetadataSchema>;
@@ -44,7 +48,27 @@ function attachMeta<T>(payload: T, meta: ReasoningMetadata): T {
     if (!cloned.meta.warnings?.length) {
         delete cloned.meta.warnings;
     }
+    if (!cloned.meta.prompt_chars) {
+        delete cloned.meta.prompt_chars;
+    }
+    if (!cloned.meta.prompt_tokens_estimate) {
+        delete cloned.meta.prompt_tokens_estimate;
+    }
+    if (!cloned.meta.response_chars) {
+        delete cloned.meta.response_chars;
+    }
+    if (!cloned.meta.response_tokens_estimate) {
+        delete cloned.meta.response_tokens_estimate;
+    }
     return cloned;
+}
+
+function estimateTokens(text: string): number {
+    const normalized = text.trim();
+    if (!normalized) {
+        return 0;
+    }
+    return Math.max(1, Math.ceil(normalized.length / 4));
 }
 
 function buildCandidates(raw: string): string[] {
@@ -97,6 +121,10 @@ function tryParse(candidate: string) {
 export async function sampleStructuredJson<T>({ server, prompt, maxTokens, schema, fallback }: SampleStructuredOptions<T>) {
     const warnings: string[] = [];
     let raw = "";
+    const promptMetrics = {
+        prompt_chars: prompt.length,
+        prompt_tokens_estimate: estimateTokens(prompt),
+    };
 
     // Try to use direct LLM sampling first (unless in local mode)
     try {
@@ -131,23 +159,31 @@ export async function sampleStructuredJson<T>({ server, prompt, maxTokens, schem
         }
         const validated = schema.safeParse(parsed.value);
         if (validated.success) {
+            const responseText = raw.trim();
             const data = attachMeta(validated.data, {
                 source: "model",
                 warnings,
-                raw: raw.trim() || undefined,
+                raw: responseText || undefined,
+                ...promptMetrics,
+                response_chars: responseText.length,
+                response_tokens_estimate: estimateTokens(responseText),
             });
-            return { data, text: JSON.stringify(data, null, 2), usedFallback: false as const };
+            return { data, text: JSON.stringify(data), usedFallback: false as const };
         }
         warnings.push(`Schema validation error: ${validated.error.message}`);
     }
 
     const fallbackValue = resolveFallback(fallback);
+    const fallbackJson = JSON.stringify(fallbackValue);
     const data = attachMeta(fallbackValue, {
         source: "fallback",
         warnings: warnings.length ? warnings : ["Used deterministic fallback output."],
         raw: raw.trim() || undefined,
+        ...promptMetrics,
+        response_chars: fallbackJson.length,
+        response_tokens_estimate: estimateTokens(fallbackJson),
     });
-    return { data, text: JSON.stringify(data, null, 2), usedFallback: true as const };
+    return { data, text: JSON.stringify(data), usedFallback: true as const };
 }
 
 export type SampleStructuredResult<T> = Awaited<ReturnType<typeof sampleStructuredJson<T>>>;

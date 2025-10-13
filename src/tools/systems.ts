@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { jsonResult, textResult, type ToolCallback } from "../lib/mcp.js";
-import { STRICT_JSON_REMINDER } from "../lib/prompt.js";
+import { buildStructuredPrompt } from "../lib/prompt.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
 const InputSchema = z.object({
@@ -35,33 +35,27 @@ export function registerSystems(server: McpServer): void {
             return jsonResult({ error: "Invalid arguments for systems.map", issues: parsed.error.issues });
         }
         const { variables = [], context } = parsed.data;
-        const prompt = `Build a concise causal loop diagram (CLD) for the system below.
-Variables: ${variables.join(", ") || "(discover reasonable variables)"}
-Context: ${context ?? ""}
-
-Deliberation steps:
-1. Draft a Mermaid graph string that captures the dominant feedback structure (use LR orientation).
-2. List reinforcing and balancing loops with node names in order.
-3. Identify leverage_points that could shift system behaviour.
-4. Provide stock_flow_hints describing stocks plus inflows/outflows.
-5. Record key assumptions and major risks or failure modes.
-
-${STRICT_JSON_REMINDER}
-
-JSON schema to emit:
-{
- "mermaid":"graph LR; A-->B; B-.-|neg|C; ...",
- "loops":[{"type":"reinforcing","nodes":["..."]},{"type":"balancing","nodes":["..."]}],
- "leverage_points":["rules","information_flow","goals","paradigms"],
- "stock_flow_hints":[{"stock":"...","inflows":["..."],"outflows":["..."]}],
- "assumptions":["..."],
- "risks":["..."]
-}
-Return only that JSON object.`;
+        const prompt = buildStructuredPrompt({
+            mode: "Systems mapping",
+            objective: "Produce a concise causal loop diagram with leverage analysis.",
+            inputs: {
+                variables: variables.join(", ") || "(discover relevant variables)",
+                context,
+            },
+            steps: [
+                "Draft a Mermaid graph string capturing dominant feedback structure (use LR orientation).",
+                "List reinforcing and balancing loops with node order.",
+                "Identify leverage_points that shift system behaviour.",
+                "Provide stock_flow_hints covering stocks plus inflows/outflows.",
+                "Record key assumptions and major risks/failure modes.",
+            ],
+            schema:
+                '{"mermaid":"","loops":[{"type":"reinforcing","nodes":[]}],"leverage_points":[],"stock_flow_hints":[{"stock":"","inflows":[],"outflows":[]}],"assumptions":[],"risks":[]}',
+        });
         const { text } = await sampleStructuredJson({
             server,
             prompt,
-            maxTokens: 1000,
+            maxTokens: 520,
             schema: OutputSchema,
             fallback: () => ({
                 mermaid: "graph LR; need[Need]-->action[Action]; action-->outcome[Outcome]; outcome-->|feedback|need;",

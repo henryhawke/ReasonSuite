@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { textResult, type ToolCallback } from "../lib/mcp.js";
-import { STRICT_JSON_REMINDER } from "../lib/prompt.js";
+import { jsonResult, textResult, type ToolCallback } from "../lib/mcp.js";
+import { buildStructuredPrompt } from "../lib/prompt.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
 const InputSchema = z.object({
@@ -30,35 +30,32 @@ const OutputSchema = z
 
 export function registerScientific(server: McpServer): void {
     const handler: ToolCallback<any> = async (rawArgs, _extra) => {
-        const { goal, context, allow_tools } = rawArgs as InputArgs;
-        const prompt = `You are an agent following a Scientific Analytic Framework.
-Goal: ${goal}
-Context: ${context ?? ""}
-
-Deliberation steps:
-1. Decomposition – break the goal into manageable sub-problems or questions.
-2. Hypotheses – list candidate explanations or solution directions to test.
-3. Tests – propose concrete experiments, code executions, constraint checks, or observations (prefer tool calls if allow_tools is true).
-4. Verification – describe how falsification or validation will occur (Popper style).
-5. Answer – deliver the best current conclusion with caveats.
-
-Prefer simpler explanations (Occam/MDL). If tools are allowed: propose concrete checks (unit tests, Z3 constraints, code run).
-
-${STRICT_JSON_REMINDER}
-
-JSON schema to emit:
-{
-  "decomposition": ["..."],
-  "hypotheses": ["..."],
-  "tests": ["tool/check to run"],
- "verification": {"strategy":"...","popper_falsification":"..."},
- "answer": "final"
-}
-Return only that JSON object.`;
+        const parsed = InputSchema.safeParse(rawArgs);
+        if (!parsed.success) {
+            return jsonResult({ error: "Invalid arguments for reasoning.scientific", issues: parsed.error.issues });
+        }
+        const { goal, context, allow_tools } = parsed.data;
+        const prompt = buildStructuredPrompt({
+            mode: "Scientific method",
+            objective: "Decompose the goal, test hypotheses, and report falsification path.",
+            inputs: { goal, context, allow_tools: allow_tools ? "true" : "false" },
+            steps: [
+                "Decomposition: break the goal into sub-questions.",
+                "Hypotheses: list candidate explanations or solution directions.",
+                allow_tools
+                    ? "Tests: propose experiments or tool calls (unit, z3, exec, etc.)."
+                    : "Tests: propose conceptual checks or observations without tools.",
+                "Verification: explain falsification or validation (Popper style).",
+                "Answer: deliver best conclusion with caveats.",
+            ],
+            extras: ["Prefer simpler explanations (Occam/MDL)."],
+            schema:
+                '{"decomposition":[],"hypotheses":[],"tests":[],"verification":{"strategy":"","popper_falsification":""},"answer":""}',
+        });
         const { text } = await sampleStructuredJson({
             server,
             prompt,
-            maxTokens: 900,
+            maxTokens: 480,
             schema: OutputSchema,
             fallback: () => ({
                 decomposition: ["Understand requirements", "List governing constraints"],
