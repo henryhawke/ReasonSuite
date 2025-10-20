@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { jsonResult, textResult, type ToolCallback } from "../lib/mcp.js";
+import { normalizeToolInput } from "../lib/args.js";
 import { buildStructuredPrompt } from "../lib/prompt.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 
@@ -26,7 +27,7 @@ const OutputSchema = z
 
 export function registerSocratic(server: McpServer): void {
     const handler: ToolCallback<any> = async (rawArgs, _extra) => {
-        const parsed = InputSchema.safeParse(rawArgs);
+        const parsed = InputSchema.safeParse(normalizeToolInput(rawArgs));
         if (!parsed.success) {
             return jsonResult({ error: "Invalid arguments for socratic.inquire", issues: parsed.error.issues });
         }

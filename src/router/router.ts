@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { jsonResult, textResult, type ToolCallback } from "../lib/mcp.js";
+import { normalizeToolInput } from "../lib/args.js";
 import { buildStructuredPrompt } from "../lib/prompt.js";
 import { DEFAULT_RAZORS } from "../lib/razors.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
@@ -57,9 +58,11 @@ const MODE_KEYWORD_RULES: Array<{ pattern: RegExp; mode: z.infer<typeof ModeSche
 
 function determineMode(value: string, tool?: string): z.infer<typeof ModeSchema> {
     const normalizedValue = value.trim().toLowerCase();
+    const fallbackMode: z.infer<typeof ModeSchema> = "socratic";
+
     if (normalizedValue.length === 0) {
         const fromTool = tool ? TOOL_TO_MODE[tool.toLowerCase()] : undefined;
-        return (fromTool ?? normalizedValue) as z.infer<typeof ModeSchema>;
+        return fromTool ?? fallbackMode;
     }
 
     const directAlias = MODE_ALIASES[normalizedValue];
@@ -86,7 +89,7 @@ function determineMode(value: string, tool?: string): z.infer<typeof ModeSchema>
         return aliasByFirstWord;
     }
 
-    return normalizedValue as z.infer<typeof ModeSchema>;
+    return fallbackMode;
 }
 
 const StepBaseSchema = z.object({
@@ -153,7 +156,7 @@ const SIGNAL_DESCRIPTIONS: Record<keyof RouterSignals, string> = {
 
 export function registerRouter(server: McpServer): void {
     const handler: ToolCallback<any> = async (rawArgs, _extra) => {
-        const parsed = InputSchema.safeParse(rawArgs);
+        const parsed = InputSchema.safeParse(normalizeToolInput(rawArgs));
         if (!parsed.success) {
             return jsonResult({ error: "Invalid arguments for reasoning.router.plan", issues: parsed.error.issues });
         }
@@ -238,12 +241,17 @@ export function registerRouter(server: McpServer): void {
 function detectSignals(task: string, context: string | undefined): RouterSignals {
     const normalized = `${task} ${context ?? ""}`.toLowerCase();
     const contains = (pattern: RegExp) => pattern.test(normalized);
+    const numericConstraintCue = /\b\d+(?:\.\d+)?\s*(?:%|percent|hours?|days?|weeks?|months?|years?|usd|dollars?|€|eur|£|gbp|ms|s|seconds?|minutes?|reqs?|requests?|rpm|rps|users?|people|teams?|headcount|units?|items?|tickets?|capacity)\b/.test(normalized);
+    const quantitativeCue = /\b(optimi[sz]|balanc|allocat|schedule|plan|forecast|budget|limit|maximi|minimi|capacity|throughput|latency|utiliz|sla|target|goal|quota|load)\b/.test(normalized);
+    const versionReference = /\bversion\s*\d+(?:\.\d+)?\b/.test(normalized);
 
     return {
         needsHypotheses: contains(/diagnos|root cause|why|uncertain|hypothesis|investigat|anomal/),
         needsCreative: contains(/brainstorm|idea|innov|option|alternativ|explore/),
         needsSystems: contains(/system|feedback|loop|dynamics|ecosystem|supply|demand|stock|flow/),
-        needsConstraint: contains(/constraint|optimi[sz]e|allocate|schedule|budget|limit|maximize|minimize|>=|<=/),
+        needsConstraint:
+            contains(/constraint|optimi[sz]e|allocate|schedule|budget|limit|maximize|minimize|>=|<=|tradeoff curve|capacity/) ||
+            (!versionReference && numericConstraintCue && quantitativeCue),
         needsRisk: contains(/risk|safety|security|privacy|abuse|attack|hazard|failure|compliance|bias/),
         contested: contains(/trade-?off|controvers|policy|ethic|disagree|stakeholder|debate/),
         wantsAnalogy: contains(/analogy|analog|similar to|compare|precedent|case study/),
@@ -336,7 +344,7 @@ function buildHeuristicPlan(task: string, context: string | undefined, maxSteps:
         mode: "socratic",
         tool: "socratic.inquire",
         why: "Clarify scope, success criteria, and hidden assumptions",
-        args: { depth: signals.deepScope ? 3 : 2 },
+        args: { topic: task, depth: signals.deepScope ? 3 : 2 },
     });
 
     if (signals.needsCreative) {
@@ -353,7 +361,7 @@ function buildHeuristicPlan(task: string, context: string | undefined, maxSteps:
             mode: "abductive",
             tool: "abductive.hypothesize",
             why: "Generate and score candidate explanations",
-            args: { k: signals.needsCreative ? 5 : 4, apply_razors: [...DEFAULT_RAZORS] },
+            args: { observations: task, k: signals.needsCreative ? 5 : 4, apply_razors: [...DEFAULT_RAZORS] },
         });
     }
 
@@ -371,7 +379,7 @@ function buildHeuristicPlan(task: string, context: string | undefined, maxSteps:
             mode: "analogical",
             tool: "analogical.map",
             why: "Transfer structure from analogous domains while flagging mismatches",
-            args: {},
+            args: { source_domain: "general problem-solving", target_problem: task },
         });
     }
 
@@ -380,7 +388,7 @@ function buildHeuristicPlan(task: string, context: string | undefined, maxSteps:
             mode: "constraint",
             tool: "constraint.solve",
             why: "Check feasibility against formal constraints or optimisation goals",
-            args: { model_json: "" },
+            args: { model_json: JSON.stringify({ variables: [], constraints: [`task: "${task}"`] }) },
         });
     }
 
@@ -390,7 +398,7 @@ function buildHeuristicPlan(task: string, context: string | undefined, maxSteps:
             mode: "redblue",
             tool: "redblue.challenge",
             why: "Stress-test for failure modes and mitigations before deployment",
-            args: { rounds: Math.min(3, Math.max(1, maxSteps - steps.length || 1)), focus: ["safety", "security", "bias"] },
+            args: { proposal: task, rounds: Math.min(3, Math.max(1, maxSteps - steps.length || 1)), focus: ["safety", "security", "bias"] },
         };
 
         let inserted = push(riskStep, omissionMessage);
@@ -429,7 +437,7 @@ function buildHeuristicPlan(task: string, context: string | undefined, maxSteps:
             mode: "scientific",
             tool: "reasoning.scientific",
             why: "Design falsifiable tests and evidence checks",
-            args: { allow_tools: true },
+            args: { goal: task, allow_tools: true },
         });
         if (!steps.some((step) => step.mode === "scientific")) {
             notes.push("Experiment signal detected but reasoning.scientific was skipped due to step limit.");
@@ -450,7 +458,7 @@ function buildHeuristicPlan(task: string, context: string | undefined, maxSteps:
             mode: "self_explain",
             tool: "reasoning.self_explain",
             why: "Produce transparent rationale, citations, and self-critique",
-            args: { allow_citations: true },
+            args: { query: task, allow_citations: true },
         });
     }
 
@@ -459,7 +467,7 @@ function buildHeuristicPlan(task: string, context: string | undefined, maxSteps:
             mode: "dialectic",
             tool: "dialectic.tas",
             why: "Surface thesis/antithesis and synthesize trade-offs",
-            args: { audience: "general" },
+            args: { claim: task, audience: "general" },
         });
     }
 
@@ -470,7 +478,7 @@ function buildHeuristicPlan(task: string, context: string | undefined, maxSteps:
             mode: "dialectic",
             tool: "dialectic.tas",
             why: "Synthesize trade-offs before final decision",
-            args: { audience: "general" },
+            args: { claim: task, audience: "general" },
         });
     }
 
@@ -518,7 +526,7 @@ function buildHeuristicPlan(task: string, context: string | undefined, maxSteps:
                 mode: "scientific",
                 tool: "reasoning.scientific",
                 why: "Structure the next investigative steps when no other heuristic fired",
-                args: { allow_tools: true },
+                args: { goal: task, allow_tools: true },
             });
         }
     }

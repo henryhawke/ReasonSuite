@@ -163,7 +163,7 @@ async function callOpenRouter(prompt, maxTokens) {
     const headers = {
         "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://github.com/your-repo/reasonsuite", // Replace with your actual repo
+        "HTTP-Referer": "https://github.com/henryhawke/ReasonSuite",
         "X-Title": "ReasonSuite",
     };
     const body = {

@@ -14,6 +14,7 @@ async function testSelectorLLM() {
 
   const server = new TestLLMServer();
   registerSelector(server);
+  let result;
 
   try {
     const selectorResult = await server.tools.get("reasoning.selector")({
@@ -39,7 +40,6 @@ async function testSelectorLLM() {
 
     console.log("Raw response:", textContent);
 
-    let result;
     try {
       result = JSON.parse(textContent);
       console.log("Selector result:", JSON.stringify(result, null, 2));

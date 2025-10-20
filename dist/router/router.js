@@ -1,6 +1,7 @@
 import { z } from "zod";
-import { textResult } from "../lib/mcp.js";
-import { STRICT_JSON_REMINDER } from "../lib/prompt.js";
+import { jsonResult, textResult } from "../lib/mcp.js";
+import { normalizeToolInput } from "../lib/args.js";
+import { buildStructuredPrompt } from "../lib/prompt.js";
 import { DEFAULT_RAZORS } from "../lib/razors.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 import { buildFallback as selectorFallback } from "../tools/selector.js";
@@ -50,9 +51,10 @@ const MODE_KEYWORD_RULES = [
 ];
 function determineMode(value, tool) {
     const normalizedValue = value.trim().toLowerCase();
+    const fallbackMode = "socratic";
     if (normalizedValue.length === 0) {
         const fromTool = tool ? TOOL_TO_MODE[tool.toLowerCase()] : undefined;
-        return (fromTool ?? normalizedValue);
+        return fromTool ?? fallbackMode;
     }
     const directAlias = MODE_ALIASES[normalizedValue];
     if (directAlias) {
@@ -74,7 +76,7 @@ function determineMode(value, tool) {
     if (aliasByFirstWord) {
         return aliasByFirstWord;
     }
-    return normalizedValue;
+    return fallbackMode;
 }
 const StepBaseSchema = z.object({
     mode: z.string(),
@@ -117,7 +119,11 @@ const SIGNAL_DESCRIPTIONS = {
 };
 export function registerRouter(server) {
     const handler = async (rawArgs, _extra) => {
-        const { task, context, maxSteps } = rawArgs;
+        const parsed = InputSchema.safeParse(normalizeToolInput(rawArgs));
+        if (!parsed.success) {
+            return jsonResult({ error: "Invalid arguments for reasoning.router.plan", issues: parsed.error.issues });
+        }
+        const { task, context, maxSteps } = parsed.data;
         const signals = detectSignals(task, context);
         const heuristicsList = summarizeSignals(signals);
         const heuristicsBlock = heuristicsList.length
@@ -137,46 +143,31 @@ export function registerRouter(server) {
             "reasoning.divergent_convergent — brainstorm options then converge with scoring",
             "exec.run — execute sandboxed JavaScript for quick calculations or prototypes",
         ].join("\n");
-        const prompt = `You are a planner and planning assistant that selects reasoning tools for an autonomous analyst.
-
-Mode quick reference (tool → cue):
-${modeReference}
-
-Heuristic signals detected for this request:
-${heuristicsBlock}
-
-Task: ${task}
-Context: ${context ?? "(none)"}
-
-Planning rules:
-- Limit the plan to ${maxSteps} steps.
-- Always begin with socratic.inquire unless the question is already fully specified.
-- Whenever you add abductive or divergent steps, schedule razors.apply immediately afterwards.
-- Insert redblue.challenge before final answers when risk, safety, or deployment concerns appear.
-- Provide short "why" rationales and populate args as JSON objects (use {} when no parameters are needed).
-- Use notes to flag limitations, dependencies, or follow-up actions in one sentence.
-
-Deliberation steps:
-1. Summarize the goal/context internally and check if socratic clarification is still needed.
-2. Evaluate each heuristic signal and decide which modes are essential within the ${maxSteps}-step cap.
-3. Sequence the modes so clarifying/creative steps precede evaluation, and verification/risk steps precede conclusions.
-4. Fill args with the minimal structured parameters each tool needs (e.g., depth for socratic, focus arrays for redblue).
-5. Confirm razors.apply follows any hypothesis/ideation generator and avoid duplicate modes unless justified.
-
-${STRICT_JSON_REMINDER}
-
-JSON schema to emit:
-{
-  "steps": [
-    {"mode":"...","tool":"tool.id","why":"...","args":{}}
-  ],
-  "notes": "one-line on expected limitations"
-}
-Return only that JSON object.`;
+        const prompt = buildStructuredPrompt({
+            mode: "Router planner",
+            objective: `Design a ${maxSteps}-step tool plan for the analyst.`,
+            inputs: { task, context: context ?? "(none)" },
+            steps: [
+                "Summarize goal/context internally and decide if socratic clarification is needed first.",
+                "Evaluate heuristic signals and choose essential modes within the step cap.",
+                "Sequence modes so clarify/creative precede evaluation and risk/verification precede conclusions.",
+                "Fill args with minimal structured parameters required per tool.",
+                "Ensure razors.apply follows hypothesis/ideation tools and avoid duplicates unless justified.",
+            ],
+            extras: [
+                "Mode quick reference (tool → cue):",
+                modeReference,
+                "Heuristic signals detected:",
+                heuristicsBlock,
+                "Planning rules:",
+                `- Limit the plan to ${maxSteps} steps.\n- Start with socratic.inquire unless scope is already clear.\n- Follow abductive/divergent with razors.apply.\n- Add redblue.challenge before final answers when risk appears.\n- Provide short \"why\" rationales and JSON args (use {} when empty).\n- Use notes for one-line limitations or follow-ups.`,
+            ],
+            schema: '{"steps":[{"mode":"","tool":"","why":"","args":{}}],"notes":""}',
+        });
         const { text } = await sampleStructuredJson({
             server,
             prompt,
-            maxTokens: 600,
+            maxTokens: 420,
             schema: PlanSchema,
             fallback: () => buildHeuristicPlan(task, context, maxSteps),
         });
@@ -197,11 +188,15 @@ Return only that JSON object.`;
 function detectSignals(task, context) {
     const normalized = `${task} ${context ?? ""}`.toLowerCase();
     const contains = (pattern) => pattern.test(normalized);
+    const numericConstraintCue = /\b\d+(?:\.\d+)?\s*(?:%|percent|hours?|days?|weeks?|months?|years?|usd|dollars?|€|eur|£|gbp|ms|s|seconds?|minutes?|reqs?|requests?|rpm|rps|users?|people|teams?|headcount|units?|items?|tickets?|capacity)\b/.test(normalized);
+    const quantitativeCue = /\b(optimi[sz]|balanc|allocat|schedule|plan|forecast|budget|limit|maximi|minimi|capacity|throughput|latency|utiliz|sla|target|goal|quota|load)\b/.test(normalized);
+    const versionReference = /\bversion\s*\d+(?:\.\d+)?\b/.test(normalized);
     return {
         needsHypotheses: contains(/diagnos|root cause|why|uncertain|hypothesis|investigat|anomal/),
         needsCreative: contains(/brainstorm|idea|innov|option|alternativ|explore/),
         needsSystems: contains(/system|feedback|loop|dynamics|ecosystem|supply|demand|stock|flow/),
-        needsConstraint: contains(/constraint|optimi[sz]e|allocate|schedule|budget|limit|maximize|minimize|>=|<=/),
+        needsConstraint: contains(/constraint|optimi[sz]e|allocate|schedule|budget|limit|maximize|minimize|>=|<=|tradeoff curve|capacity/) ||
+            (!versionReference && numericConstraintCue && quantitativeCue),
         needsRisk: contains(/risk|safety|security|privacy|abuse|attack|hazard|failure|compliance|bias/),
         contested: contains(/trade-?off|controvers|policy|ethic|disagree|stakeholder|debate/),
         wantsAnalogy: contains(/analogy|analog|similar to|compare|precedent|case study/),
@@ -281,7 +276,7 @@ function buildHeuristicPlan(task, context, maxSteps) {
         mode: "socratic",
         tool: "socratic.inquire",
         why: "Clarify scope, success criteria, and hidden assumptions",
-        args: { depth: signals.deepScope ? 3 : 2 },
+        args: { topic: task, depth: signals.deepScope ? 3 : 2 },
     });
     if (signals.needsCreative) {
         push({
@@ -296,7 +291,7 @@ function buildHeuristicPlan(task, context, maxSteps) {
             mode: "abductive",
             tool: "abductive.hypothesize",
             why: "Generate and score candidate explanations",
-            args: { k: signals.needsCreative ? 5 : 4, apply_razors: [...DEFAULT_RAZORS] },
+            args: { observations: task, k: signals.needsCreative ? 5 : 4, apply_razors: [...DEFAULT_RAZORS] },
         });
     }
     if (signals.needsSystems) {
@@ -312,7 +307,7 @@ function buildHeuristicPlan(task, context, maxSteps) {
             mode: "analogical",
             tool: "analogical.map",
             why: "Transfer structure from analogous domains while flagging mismatches",
-            args: {},
+            args: { source_domain: "general problem-solving", target_problem: task },
         });
     }
     if (signals.needsConstraint) {
@@ -320,7 +315,7 @@ function buildHeuristicPlan(task, context, maxSteps) {
             mode: "constraint",
             tool: "constraint.solve",
             why: "Check feasibility against formal constraints or optimisation goals",
-            args: { model_json: "" },
+            args: { model_json: JSON.stringify({ variables: [], constraints: [`task: "${task}"`] }) },
         });
     }
     if (signals.needsRisk) {
@@ -329,7 +324,7 @@ function buildHeuristicPlan(task, context, maxSteps) {
             mode: "redblue",
             tool: "redblue.challenge",
             why: "Stress-test for failure modes and mitigations before deployment",
-            args: { rounds: Math.min(3, Math.max(1, maxSteps - steps.length || 1)), focus: ["safety", "security", "bias"] },
+            args: { proposal: task, rounds: Math.min(3, Math.max(1, maxSteps - steps.length || 1)), focus: ["safety", "security", "bias"] },
         };
         let inserted = push(riskStep, omissionMessage);
         if (!inserted) {
@@ -364,7 +359,7 @@ function buildHeuristicPlan(task, context, maxSteps) {
             mode: "scientific",
             tool: "reasoning.scientific",
             why: "Design falsifiable tests and evidence checks",
-            args: { allow_tools: true },
+            args: { goal: task, allow_tools: true },
         });
         if (!steps.some((step) => step.mode === "scientific")) {
             notes.push("Experiment signal detected but reasoning.scientific was skipped due to step limit.");
@@ -383,7 +378,7 @@ function buildHeuristicPlan(task, context, maxSteps) {
             mode: "self_explain",
             tool: "reasoning.self_explain",
             why: "Produce transparent rationale, citations, and self-critique",
-            args: { allow_citations: true },
+            args: { query: task, allow_citations: true },
         });
     }
     if (signals.contested) {
@@ -391,7 +386,7 @@ function buildHeuristicPlan(task, context, maxSteps) {
             mode: "dialectic",
             tool: "dialectic.tas",
             why: "Surface thesis/antithesis and synthesize trade-offs",
-            args: { audience: "general" },
+            args: { claim: task, audience: "general" },
         });
     }
     ensureRazorPlacement();
@@ -400,7 +395,7 @@ function buildHeuristicPlan(task, context, maxSteps) {
             mode: "dialectic",
             tool: "dialectic.tas",
             why: "Synthesize trade-offs before final decision",
-            args: { audience: "general" },
+            args: { claim: task, audience: "general" },
         });
     }
     if (steps.length === 1 && steps[0].mode === "socratic") {
@@ -446,7 +441,7 @@ function buildHeuristicPlan(task, context, maxSteps) {
                 mode: "scientific",
                 tool: "reasoning.scientific",
                 why: "Structure the next investigative steps when no other heuristic fired",
-                args: { allow_tools: true },
+                args: { goal: task, allow_tools: true },
             });
         }
     }

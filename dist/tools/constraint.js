@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { jsonResult } from "../lib/mcp.js";
+import { normalizeToolInput } from "../lib/args.js";
 import { parseModel } from "../lib/dsl.js";
 import { init } from "z3-solver";
 const ModelSchema = z.object({
@@ -87,7 +88,7 @@ function serializeModel(entries) {
 export function registerConstraint(server) {
     const handler = async (rawArgs, _extra) => {
         // Validate and apply defaults to input arguments
-        const parsed = InputSchema.safeParse(rawArgs);
+        const parsed = InputSchema.safeParse(normalizeToolInput(rawArgs));
         if (!parsed.success) {
             return jsonResult({ error: "Invalid arguments for constraint.solve", issues: parsed.error.issues });
         }

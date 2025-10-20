@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { jsonResult } from "../lib/mcp.js";
+import { normalizeToolInput } from "../lib/args.js";
 import { DEFAULT_RAZORS } from "../lib/razors.js";
 const InputSchema = z
     .object({
@@ -51,7 +52,7 @@ function resolveHandler(server, toolName) {
 }
 export function registerReasoning(server) {
     const handler = async (rawArgs, extra) => {
-        const parsed = InputSchema.safeParse(rawArgs);
+        const parsed = InputSchema.safeParse(normalizeToolInput(rawArgs));
         if (!parsed.success) {
             return jsonResult({ error: "Invalid arguments", issues: parsed.error.issues });
         }

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { definePromptArgsShape, STRICT_JSON_REMINDER } from "../lib/prompt.js";
+import { definePromptArgsShape, STRICT_JSON_COMPACT } from "../lib/prompt.js";
 const ArgsSchema = z.object({
     model_json: z.string(),
 });
@@ -42,7 +42,7 @@ ${model_json}
    - unsatisfiable → {"status": "unsat", "model": {}}
    - unknown → {"status": "unknown", "model": {}}
 
-${STRICT_JSON_REMINDER}
+${STRICT_JSON_COMPACT}
 
 **Output Schema:**
 {"status": "sat|unsat|unknown", "model": {"var": "value"}}

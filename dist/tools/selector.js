@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { textResult } from "../lib/mcp.js";
+import { jsonResult, textResult } from "../lib/mcp.js";
+import { normalizeToolInput } from "../lib/args.js";
 import { DEFAULT_RAZORS, RAZOR_DESCRIPTIONS } from "../lib/razors.js";
-import { STRICT_JSON_REMINDER } from "../lib/prompt.js";
+import { buildStructuredPrompt } from "../lib/prompt.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 const MODE_IDS = [
     "socratic",
@@ -208,6 +209,9 @@ function clampScore(value) {
 }
 export function buildFallback(request, context, modes, razors) {
     const text = `${request} ${context ?? ""}`.toLowerCase();
+    const numericConstraintCue = /\b\d+(?:\.\d+)?\s*(?:%|percent|hours?|days?|weeks?|months?|years?|usd|dollars?|€|eur|£|gbp|ms|s|seconds?|minutes?|reqs?|requests?|rpm|rps|users?|people|teams?|headcount|units?|items?|tickets?|capacity)\b/.test(text);
+    const quantitativeCue = /\b(optimi[sz]|balanc|allocat|schedule|plan|forecast|budget|limit|maximi|minimi|capacity|throughput|latency|utiliz|sla|target|goal|quota|load)\b/.test(text);
+    const versionReference = /\bversion\s*\d+(?:\.\d+)?\b/.test(text);
     const available = new Set(modes);
     const scores = new Map();
     const reasons = new Map();
@@ -245,7 +249,12 @@ export function buildFallback(request, context, modes, razors) {
         addReason("razors.apply", "Hypotheses benefit from razor screening", 0.2);
     }, "Detected incident/diagnosis cues (debug/latency/error/etc.)", "Points to abductive hypothesis ranking and razor screening");
     detect(/system|feedback|loop|dynamic|ecosystem|interdepend|supply|demand|network|ripple/, () => addReason("systems", "Systems/dynamics vocabulary", 0.42), "Systems or dynamics terminology present", "Map causal loops and leverage points");
-    const constraint = detect(/constraint|optimi[sz]|schedule|budget|allocat|limit|maximi|minimi|>=|<=|\b\d+\b|tradeoff curve|capacity/, () => addReason("constraint", "Optimization/constraint cues", 0.48), "Optimization or numeric constraints noted", "Prefer constraint solving to test feasibility");
+    let constraint = detect(/constraint|optimi[sz]|schedule|budget|allocat|limit|maximi|minimi|>=|<=|tradeoff curve|capacity/, () => addReason("constraint", "Optimization/constraint cues", 0.48), "Optimization or numeric constraints noted", "Prefer constraint solving to test feasibility");
+    if (!constraint && numericConstraintCue && quantitativeCue && !versionReference) {
+        constraint = true;
+        note("Numbers paired with planning/capacity terms detected", "Constraint solving checks feasibility of quantitative targets");
+        addReason("constraint", "Quantitative planning metrics detected", 0.32);
+    }
     const risk = detect(/risk|safety|attack|threat|abuse|hazard|failure|compliance|bias|exploit|breach/, () => addReason("redblue", "Risk/threat keywords", 0.46), "Risk or adversarial words detected", "Red/blue challenge to stress-test mitigations");
     detect(/debate|controvers|trade-?off|stakeholder|disagree|policy|ethic|tension/, () => addReason("dialectic", "Contested/dual-view framing", 0.38), "Contested or policy language present", "Dialectic TAS to surface trade-offs");
     detect(/analog|similar|compare|precedent|case study|metaphor|analogy/, () => addReason("analogical", "Analogy/comparison keywords", 0.4), "Analogy or comparison cues", "Analogical mapping to transfer structure and flag mismatches");
@@ -374,15 +383,38 @@ export function rankRazorsFallback(opts) {
 }
 export function registerSelector(server) {
     const handler = async (rawArgs, _extra) => {
-        const { request, context, candidate_modes, candidate_razors } = rawArgs;
+        const parsed = InputSchema.safeParse(normalizeToolInput(rawArgs));
+        if (!parsed.success) {
+            return jsonResult({ error: "Invalid arguments for reasoning.selector", issues: parsed.error.issues });
+        }
+        const { request, context, candidate_modes, candidate_razors } = parsed.data;
         const modes = (candidate_modes?.length ? candidate_modes : [...MODE_IDS]).filter(isModeId);
         const normalizedModes = modes.length ? modes : [...MODE_IDS];
         const razorList = candidate_razors?.length ? candidate_razors : [...DEFAULT_RAZORS];
-        const prompt = `You are the ReasonSuite meta-selector. Analyze the user's request and recommend the single best reasoning mode to run next plus the razors to stack afterwards. Work through the cues explicitly and keep the output JSON strict.\n\nRequest: ${request}\nContext: ${context ?? "(none)"}\n\nCandidate thinking modes:\n${renderModeCatalog(normalizedModes)}\n\nCandidate razors:\n${renderRazorCatalog(razorList)}\n\nDeliberation instructions:\n1. Extract the salient signals or keywords from the request/context.\n2. Score each candidate mode between 0 and 1 using those signals.\n3. Pick the highest-utility primary_mode (prefer modes over razors unless the request explicitly centers razors).\n4. List up to three supporting modes with short justifications.\n5. Recommend up to four razors in the order they should be applied, or none if irrelevant.\n6. Document your reasoning steps as observation/implication pairs in decision_path.\n\n${STRICT_JSON_REMINDER}\n\nJSON schema to emit:\n{\n  "primary_mode": {"id":"mode id","label":"human label","confidence":0.0-1.0,"reason":"summary"},\n  "supporting_modes": [{"id":"...","label":"...","score":0.0-1.0,"reason":"..."}],\n  "razor_stack": [{"id":"...","label":"...","score":0.0-1.0,"reason":"..."}],\n  "decision_path": [{"observation":"...","implication":"..."}],\n  "next_action": "optional guidance",\n  "notes": "optional caveats"\n}\nReturn only that JSON object.`;
+        const prompt = buildStructuredPrompt({
+            mode: "Mode selector",
+            objective: "Recommend the best reasoning mode to run next plus follow-up razors.",
+            inputs: { request, context: context ?? "(none)" },
+            steps: [
+                "Extract salient signals or keywords from request/context.",
+                "Score each candidate mode 0-1 using those signals.",
+                "Pick the highest-utility primary_mode (prefer modes unless request centers razors).",
+                "List up to three supporting modes with short reasons.",
+                "Recommend up to four razors in order or none if irrelevant.",
+                "Document reasoning steps as observation→implication pairs in decision_path.",
+            ],
+            extras: [
+                "Candidate thinking modes:",
+                renderModeCatalog(normalizedModes),
+                "Candidate razors:",
+                renderRazorCatalog(razorList),
+            ],
+            schema: '{"primary_mode":{"id":"","label":"","confidence":0,"reason":""},"supporting_modes":[{"id":"","label":"","score":0,"reason":""}],"razor_stack":[{"id":"","label":"","score":0,"reason":""}],"decision_path":[{"observation":"","implication":""}],"next_action":"","notes":""}',
+        });
         const { text } = await sampleStructuredJson({
             server,
             prompt,
-            maxTokens: 750,
+            maxTokens: 620,
             schema: OutputSchema,
             fallback: () => buildFallback(request, context, normalizedModes, razorList),
         });

@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { jsonResult, textResult, type ToolCallback } from "../lib/mcp.js";
+import { normalizeToolInput } from "../lib/args.js";
 import { buildStructuredPrompt } from "../lib/prompt.js";
 import { DEFAULT_RAZORS, summarizeRazors } from "../lib/razors.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
@@ -42,7 +43,7 @@ const OutputSchema = z
 export function registerAbductive(server: McpServer): void {
     const handler: ToolCallback<any> = async (rawArgs, _extra) => {
         // Validate and apply defaults to input arguments
-        const parsed = InputSchema.safeParse(rawArgs);
+        const parsed = InputSchema.safeParse(normalizeToolInput(rawArgs));
         if (!parsed.success) {
             return jsonResult({ error: "Invalid arguments for abductive.hypothesize", issues: parsed.error.issues });
         }

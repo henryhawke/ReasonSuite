@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { Script, createContext } from "node:vm";
 import { jsonResult } from "../lib/mcp.js";
+import { normalizeToolInput } from "../lib/args.js";
 const InputSchema = z.object({
     code: z
         .string()
@@ -108,7 +109,11 @@ function runInSandbox(code, timeoutMs) {
 }
 export function registerExec(server) {
     const handler = async (rawArgs, _extra) => {
-        const { code, timeout_ms } = rawArgs;
+        const parsed = InputSchema.safeParse(normalizeToolInput(rawArgs));
+        if (!parsed.success) {
+            return jsonResult({ error: "Invalid arguments for exec.run", issues: parsed.error.issues });
+        }
+        const { code, timeout_ms } = parsed.data;
         const result = runInSandbox(code, timeout_ms);
         const payload = {
             stdout: result.stdout,

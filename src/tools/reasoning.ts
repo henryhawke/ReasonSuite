@@ -1,6 +1,7 @@
 import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { jsonResult } from "../lib/mcp.js";
+import { normalizeToolInput } from "../lib/args.js";
 import { DEFAULT_RAZORS } from "../lib/razors.js";
 
 const InputSchema = z
@@ -68,7 +69,7 @@ function resolveHandler(server: McpServer, toolName: string): ResolvedHandler | 
 
 export function registerReasoning(server: McpServer): void {
     const handler: ToolCallback<any> = async (rawArgs, extra) => {
-        const parsed = InputSchema.safeParse(rawArgs);
+        const parsed = InputSchema.safeParse(normalizeToolInput(rawArgs));
         if (!parsed.success) {
             return jsonResult({ error: "Invalid arguments", issues: parsed.error.issues });
         }

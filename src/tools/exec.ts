@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { Script, createContext } from "node:vm";
 import { jsonResult, type ToolCallback } from "../lib/mcp.js";
+import { normalizeToolInput } from "../lib/args.js";
 
 type ExecResult = {
     stdout: string[];
@@ -137,7 +138,7 @@ function runInSandbox(code: string, timeoutMs: number): ExecResult {
 
 export function registerExec(server: McpServer): void {
     const handler: ToolCallback<any> = async (rawArgs, _extra) => {
-        const parsed = InputSchema.safeParse(rawArgs);
+        const parsed = InputSchema.safeParse(normalizeToolInput(rawArgs));
         if (!parsed.success) {
             return jsonResult({ error: "Invalid arguments for exec.run", issues: parsed.error.issues });
         }

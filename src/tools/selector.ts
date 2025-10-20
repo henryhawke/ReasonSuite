@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { jsonResult, textResult, type ToolCallback } from "../lib/mcp.js";
+import { normalizeToolInput } from "../lib/args.js";
 import { DEFAULT_RAZORS, RAZOR_DESCRIPTIONS } from "../lib/razors.js";
 import { buildStructuredPrompt } from "../lib/prompt.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
@@ -267,6 +268,9 @@ export function buildFallback(
     razors: string[]
 ) {
     const text = `${request} ${context ?? ""}`.toLowerCase();
+    const numericConstraintCue = /\b\d+(?:\.\d+)?\s*(?:%|percent|hours?|days?|weeks?|months?|years?|usd|dollars?|€|eur|£|gbp|ms|s|seconds?|minutes?|reqs?|requests?|rpm|rps|users?|people|teams?|headcount|units?|items?|tickets?|capacity)\b/.test(text);
+    const quantitativeCue = /\b(optimi[sz]|balanc|allocat|schedule|plan|forecast|budget|limit|maximi|minimi|capacity|throughput|latency|utiliz|sla|target|goal|quota|load)\b/.test(text);
+    const versionReference = /\bversion\s*\d+(?:\.\d+)?\b/.test(text);
     const available = new Set<ModeId>(modes);
     const scores = new Map<ModeId, number>();
     const reasons = new Map<ModeId, Set<string>>();
@@ -326,12 +330,17 @@ export function buildFallback(
         "Map causal loops and leverage points"
     );
 
-    const constraint = detect(
-        /constraint|optimi[sz]|schedule|budget|allocat|limit|maximi|minimi|>=|<=|\b\d+\b|tradeoff curve|capacity/,
+    let constraint = detect(
+        /constraint|optimi[sz]|schedule|budget|allocat|limit|maximi|minimi|>=|<=|tradeoff curve|capacity/,
         () => addReason("constraint", "Optimization/constraint cues", 0.48),
         "Optimization or numeric constraints noted",
         "Prefer constraint solving to test feasibility"
     );
+    if (!constraint && numericConstraintCue && quantitativeCue && !versionReference) {
+        constraint = true;
+        note("Numbers paired with planning/capacity terms detected", "Constraint solving checks feasibility of quantitative targets");
+        addReason("constraint", "Quantitative planning metrics detected", 0.32);
+    }
 
     const risk = detect(
         /risk|safety|attack|threat|abuse|hazard|failure|compliance|bias|exploit|breach/,
@@ -533,7 +542,7 @@ export function rankRazorsFallback(opts: {
 
 export function registerSelector(server: McpServer): void {
     const handler: ToolCallback<any> = async (rawArgs, _extra) => {
-        const parsed = InputSchema.safeParse(rawArgs);
+        const parsed = InputSchema.safeParse(normalizeToolInput(rawArgs));
         if (!parsed.success) {
             return jsonResult({ error: "Invalid arguments for reasoning.selector", issues: parsed.error.issues });
         }
