@@ -23,6 +23,8 @@ import { registerDivergent } from "./tools/divergent.js";
 import { registerExec } from "./tools/exec.js";
 import { registerSelector } from "./tools/selector.js";
 import { registerReasoning } from "./tools/reasoning.js";
+import { registerDiagnostics } from "./tools/diagnostics.js";
+import { attachServerDiagnostics } from "./lib/server_state.js";
 
 // Prompts
 import { registerDialecticPrompts } from "./prompts/dialectic.js";
@@ -41,6 +43,7 @@ const pkgJson = JSON.parse(
 );
 
 const server = new McpServer({ name: pkgJson.name ?? "reasonsuite", version: pkgJson.version ?? "0.0.0" });
+const diagnostics = attachServerDiagnostics(server);
 
 // Register tools
 registerRouter(server);
@@ -58,6 +61,7 @@ registerDivergent(server);
 registerExec(server);
 registerSelector(server);
 registerReasoning(server);
+registerDiagnostics(server, diagnostics, { name: pkgJson.name ?? "reasonsuite", version: pkgJson.version ?? "0.0.0" });
 
 // Register prompts
 registerDialecticPrompts(server);
@@ -73,8 +77,15 @@ registerDivergentPrompts(server);
 
 const moduleDir = fileURLToPath(new URL(".", import.meta.url));
 
-async function resolveResourcePath(file: string): Promise<string> {
+async function resolveResourcePath(file: string): Promise<string | undefined> {
+    const envCandidates = (process.env.REASONSUITE_RESOURCES ?? "")
+        .split(path.delimiter)
+        .map((entry: string) => entry.trim())
+        .filter((entry: string): entry is string => entry.length > 0)
+        .map((entry: string) => path.resolve(entry, file));
+
     const candidates = [
+        ...envCandidates,
         path.resolve(moduleDir, "resources", file),
         path.resolve(moduleDir, "../resources", file),
         path.resolve(moduleDir, "../src/resources", file),
@@ -90,17 +101,37 @@ async function resolveResourcePath(file: string): Promise<string> {
         }
     }
 
-    throw new Error(`Resource file not found: ${file}`);
+    return undefined;
 }
 
 async function addResource(file: string, title: string, description: string) {
-    const p = await resolveResourcePath(file);
+    let resourceText: string;
+    let resolvedPath: string | undefined;
+    let status: "ok" | "missing" = "ok";
+    let errorMessage: string | undefined;
+
+    try {
+        resolvedPath = await resolveResourcePath(file);
+        if (!resolvedPath) {
+            throw new Error(`Resource file not found: ${file}`);
+        }
+        resourceText = await fs.readFile(resolvedPath, "utf-8");
+    } catch (error) {
+        status = "missing";
+        errorMessage = (error as Error)?.message ?? String(error);
+        const tip =
+            "Set REASONSUITE_RESOURCES to point at the directory containing ReasonSuite markdown resources when packaging.";
+        resourceText = `# Missing resource: ${file}\n\n${errorMessage ?? ""}\n\n${tip}\n`;
+        console.warn(`[ReasonSuite] ${errorMessage}`);
+    }
+
     server.registerResource(
         file,
         `doc://${file}`,
         { title, description, mimeType: "text/markdown" },
-        async (uri) => ({ contents: [{ uri: uri.href, text: await fs.readFile(p, "utf-8") }] })
+        async (uri) => ({ contents: [{ uri: uri.href, text: resourceText }] })
     );
+    diagnostics.recordResource(file, { path: resolvedPath, status, error: errorMessage });
 }
 
 await addResource("razors.md", "Reasoning Razors", "Occam/MDL, Bayesian Occam, Sagan, Hitchens, Hanlon, Popper");
@@ -116,6 +147,7 @@ const modeDescription = localMode
     : "CLOUD MODE (external LLM providers enabled)";
 
 const mode = process.env.MCP_TRANSPORT ?? "stdio";
+diagnostics.setMode({ transport: mode, description: modeDescription, localMode });
 
 if (mode === "http") {
     const port = Number(process.env.PORT ?? 3333);

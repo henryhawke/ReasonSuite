@@ -15,6 +15,8 @@ import { registerDivergent } from "./dist/tools/divergent.js";
 import { registerExec } from "./dist/tools/exec.js";
 import { registerSelector } from "./dist/tools/selector.js";
 import { registerReasoning } from "./dist/tools/reasoning.js";
+import { registerDiagnostics } from "./dist/tools/diagnostics.js";
+import { attachServerDiagnostics } from "./dist/lib/server_state.js";
 
 class TestHarnessServer {
   tools = new Map();
@@ -198,6 +200,7 @@ function parseResult(res) {
 
 async function run() {
   const server = new TestHarnessServer();
+  const diagnostics = attachServerDiagnostics(server);
 
   // Register all tools
   registerRouter(server);
@@ -215,6 +218,8 @@ async function run() {
   registerExec(server);
   registerSelector(server);
   registerReasoning(server);
+  registerDiagnostics(server, diagnostics, { name: "reasonsuite", version: "test" });
+  diagnostics.setMode({ transport: "stdio", description: "Test harness", localMode: true });
 
   const out = [];
   const call = async (name, args) => {
@@ -234,6 +239,8 @@ async function run() {
     request: "Investigate root cause of intermittent failure",
     context: "timeouts, spike at 02:00 UTC",
   });
+
+  await call("reasoning.diagnostics", { detail: "summary" });
 
   // Dialectic (aliases)
   await call("dialectic.tas", {
