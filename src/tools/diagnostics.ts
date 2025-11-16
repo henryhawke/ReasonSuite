@@ -6,6 +6,8 @@ import { normalizeToolInput } from "../lib/args.js";
 import { DEFAULT_RAZORS } from "../lib/razors.js";
 import { SIGNAL_DESCRIPTIONS } from "../router/signals.js";
 import type { ServerDiagnostics } from "../lib/server_state.js";
+import { getCacheStats, cleanSolverCache } from "../lib/verification.js";
+import { config } from "../lib/config.js";
 
 type Identity = {
     name: string;
@@ -17,8 +19,11 @@ const InputSchema = z
         detail: z.enum(["summary", "full"]).default("full"),
         pretty: z.boolean().default(false),
         include_router_signals: z.boolean().default(true),
+        include_cache: z.boolean().default(true),
+        include_policy: z.boolean().default(true),
+        clean_expired_cache: z.boolean().default(false),
     })
-    .partial({ pretty: true, include_router_signals: true });
+    .partial({ pretty: true, include_router_signals: true, include_cache: true, include_policy: true, clean_expired_cache: true });
 
 const inputSchema = InputSchema.shape;
 
@@ -76,6 +81,30 @@ type DiagnosticsPayload = {
         default_razors: string[];
         router_signals?: Record<string, string>;
     };
+    cache?: {
+        size: number;
+        totalHits: number;
+        oldestEntryAge: number | null;
+        cleanedEntries?: number;
+    };
+    policy?: {
+        maxDepth: number;
+        maxSteps: number;
+        maxTimeMs: number;
+    };
+    budget?: {
+        maxTokens: number;
+        maxCost: number;
+        solverTimeoutMs: number;
+    };
+    memoryProfile?: {
+        name: string;
+        maxCandidateLength: number;
+        maxCandidateCount: number;
+        cacheSize: number;
+        cacheTtlMs: number;
+        maxPromptTokens: number;
+    };
 };
 
 export function registerDiagnostics(server: McpServer, diagnostics: ServerDiagnostics, identity: Identity): void {
@@ -85,7 +114,7 @@ export function registerDiagnostics(server: McpServer, diagnostics: ServerDiagno
             return jsonResult({ error: "Invalid arguments for reasoning.diagnostics", issues: parsed.error.issues });
         }
 
-        const { detail, pretty, include_router_signals } = parsed.data as InputArgs;
+        const { detail, pretty, include_router_signals, include_cache, include_policy, clean_expired_cache } = parsed.data as InputArgs;
         const snapshot = await diagnostics.snapshot();
 
         const payload: DiagnosticsPayload = {
@@ -108,6 +137,28 @@ export function registerDiagnostics(server: McpServer, diagnostics: ServerDiagno
             },
             notes: snapshot.notes,
         };
+
+        // Add cache stats if requested
+        if (include_cache) {
+            const cacheStats = getCacheStats();
+            payload.cache = {
+                size: cacheStats.size,
+                totalHits: cacheStats.totalHits,
+                oldestEntryAge: cacheStats.oldestEntry ? Date.now() - cacheStats.oldestEntry : null,
+            };
+
+            if (clean_expired_cache) {
+                const cleaned = cleanSolverCache(config.memoryProfile.cacheTtlMs);
+                payload.cache.cleanedEntries = cleaned;
+            }
+        }
+
+        // Add policy and budget limits if requested
+        if (include_policy) {
+            payload.policy = config.policyLimits;
+            payload.budget = config.budgetLimits;
+            payload.memoryProfile = config.memoryProfile;
+        }
 
         if (detail === "full") {
             payload.tools = snapshot.tools.map((tool) => ({

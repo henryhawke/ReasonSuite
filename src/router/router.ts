@@ -43,18 +43,41 @@ const TOOL_TO_MODE: Partial<Record<string, z.infer<typeof ModeSchema>>> = {
     "exec.run": "exec",
 };
 
-const MODE_KEYWORD_RULES: Array<{ pattern: RegExp; mode: z.infer<typeof ModeSchema> }> = [
-    { pattern: /(clarify|scope|question|probe)/i, mode: "socratic" },
-    { pattern: /(hypoth|explanation|diagnos|root cause|test explanations)/i, mode: "abductive" },
-    { pattern: /(prune|refine|razor|screen|evaluate|critique)/i, mode: "razors.apply" },
-    { pattern: /(brainstorm|generate|diverge|ideat|option)/i, mode: "divergent" },
-    { pattern: /(system|feedback|loop|leverage|stock|flow)/i, mode: "systems" },
-    { pattern: /(analogy|analog|map structure)/i, mode: "analogical" },
-    { pattern: /(constraint|optimi[sz]|feasible|schedule|budget|limit)/i, mode: "constraint" },
-    { pattern: /(risk|threat|challenge|red team|attack)/i, mode: "redblue" },
-    { pattern: /(experiment|scientific|test plan|measure)/i, mode: "scientific" },
-    { pattern: /(explain|self[-_ ]?explain|rationale|critique)/i, mode: "self_explain" },
-    { pattern: /(code|execute|compute|script|run)/i, mode: "exec" },
+const MODE_KEYWORD_RULES: Array<{ pattern: RegExp; mode: z.infer<typeof ModeSchema>; weight?: number }> = [
+    // Core reasoning modes
+    { pattern: /(clarify|scope|question|probe|why|how|when|what if)/i, mode: "socratic", weight: 1.0 },
+    { pattern: /(hypoth|explanation|diagnos|root cause|test explanations|investigate|anomaly|incident)/i, mode: "abductive", weight: 1.2 },
+    { pattern: /(prune|refine|razor|screen|evaluate|critique|assess|judge|filter)/i, mode: "razors.apply", weight: 1.0 },
+    { pattern: /(brainstorm|generate|diverge|ideat|option|alternative|creative|explore)/i, mode: "divergent", weight: 1.0 },
+
+    // Systems & complexity
+    { pattern: /(system|feedback|loop|leverage|stock|flow|cascade|ripple|network|interconnect)/i, mode: "systems", weight: 1.1 },
+    { pattern: /(analogy|analog|map structure|similar|pattern|comparison|metaphor)/i, mode: "analogical", weight: 1.0 },
+
+    // Optimization & constraints
+    { pattern: /(constraint|optimi[sz]|feasible|schedule|budget|limit|resource|allocation|capacity|maximize|minimize)/i, mode: "constraint", weight: 1.2 },
+
+    // Risk & adversarial
+    { pattern: /(risk|threat|challenge|red team|attack|vulnerability|exploit|adversary|counter|defense|security)/i, mode: "redblue", weight: 1.1 },
+
+    // Finance & business
+    { pattern: /(revenue|profit|cost|pricing|margin|roi|valuation|finance|fiscal|monetary|investment|portfolio)/i, mode: "constraint", weight: 1.1 },
+    { pattern: /(market|competition|competitive|strategy|positioning|differentiat|advantage)/i, mode: "dialectic", weight: 1.1 },
+    { pattern: /(forecast|projection|growth|trend|metric|kpi|performance|dashboard)/i, mode: "systems", weight: 1.0 },
+
+    // Legal & compliance
+    { pattern: /(legal|compliance|regulatory|audit|govern|policy|rule|requirement|mandate|obligat)/i, mode: "razors.apply", weight: 1.2 },
+    { pattern: /(liability|risk assessment|due diligence|contract|agreement|terms)/i, mode: "dialectic", weight: 1.1 },
+
+    // Scientific & experimental
+    { pattern: /(experiment|scientific|test plan|measure|hypothesis|empirical|data|evidence|validate)/i, mode: "scientific", weight: 1.2 },
+
+    // Analysis & explanation
+    { pattern: /(explain|self[-_ ]?explain|rationale|justify|reasoning|logic|argument)/i, mode: "self_explain", weight: 1.0 },
+    { pattern: /(debate|argue|claim|counter|thesis|dialectic|position|stance)/i, mode: "dialectic", weight: 1.1 },
+
+    // Technical & execution
+    { pattern: /(code|execute|compute|script|run|program|implement|automate)/i, mode: "exec", weight: 1.0 },
 ];
 
 function determineMode(value: string, tool?: string): z.infer<typeof ModeSchema> {
