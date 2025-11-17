@@ -22,6 +22,8 @@ import { registerDivergent } from "./tools/divergent.js";
 import { registerExec } from "./tools/exec.js";
 import { registerSelector } from "./tools/selector.js";
 import { registerReasoning } from "./tools/reasoning.js";
+import { registerDiagnostics } from "./tools/diagnostics.js";
+import { attachServerDiagnostics } from "./lib/server_state.js";
 // Prompts
 import { registerDialecticPrompts } from "./prompts/dialectic.js";
 import { registerSocraticPrompts } from "./prompts/socratic.js";
@@ -35,6 +37,7 @@ import { registerSelfExplainPrompts } from "./prompts/self_explain.js";
 import { registerDivergentPrompts } from "./prompts/divergent.js";
 const pkgJson = JSON.parse(await fs.readFile(new URL("../package.json", import.meta.url), "utf-8"));
 const server = new McpServer({ name: pkgJson.name ?? "reasonsuite", version: pkgJson.version ?? "0.0.0" });
+const diagnostics = attachServerDiagnostics(server);
 // Register tools
 registerRouter(server);
 registerRazors(server);
@@ -51,6 +54,7 @@ registerDivergent(server);
 registerExec(server);
 registerSelector(server);
 registerReasoning(server);
+registerDiagnostics(server, diagnostics, { name: pkgJson.name ?? "reasonsuite", version: pkgJson.version ?? "0.0.0" });
 // Register prompts
 registerDialecticPrompts(server);
 registerSocraticPrompts(server);
@@ -64,7 +68,13 @@ registerSelfExplainPrompts(server);
 registerDivergentPrompts(server);
 const moduleDir = fileURLToPath(new URL(".", import.meta.url));
 async function resolveResourcePath(file) {
+    const envCandidates = (process.env.REASONSUITE_RESOURCES ?? "")
+        .split(path.delimiter)
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0)
+        .map((entry) => path.resolve(entry, file));
     const candidates = [
+        ...envCandidates,
         path.resolve(moduleDir, "resources", file),
         path.resolve(moduleDir, "../resources", file),
         path.resolve(moduleDir, "../src/resources", file),
@@ -79,11 +89,29 @@ async function resolveResourcePath(file) {
             // Continue trying other candidates
         }
     }
-    throw new Error(`Resource file not found: ${file}`);
+    return undefined;
 }
 async function addResource(file, title, description) {
-    const p = await resolveResourcePath(file);
-    server.registerResource(file, `doc://${file}`, { title, description, mimeType: "text/markdown" }, async (uri) => ({ contents: [{ uri: uri.href, text: await fs.readFile(p, "utf-8") }] }));
+    let resourceText;
+    let resolvedPath;
+    let status = "ok";
+    let errorMessage;
+    try {
+        resolvedPath = await resolveResourcePath(file);
+        if (!resolvedPath) {
+            throw new Error(`Resource file not found: ${file}`);
+        }
+        resourceText = await fs.readFile(resolvedPath, "utf-8");
+    }
+    catch (error) {
+        status = "missing";
+        errorMessage = error?.message ?? String(error);
+        const tip = "Set REASONSUITE_RESOURCES to point at the directory containing ReasonSuite markdown resources when packaging.";
+        resourceText = `# Missing resource: ${file}\n\n${errorMessage ?? ""}\n\n${tip}\n`;
+        console.warn(`[ReasonSuite] ${errorMessage}`);
+    }
+    server.registerResource(file, `doc://${file}`, { title, description, mimeType: "text/markdown" }, async (uri) => ({ contents: [{ uri: uri.href, text: resourceText }] }));
+    diagnostics.recordResource(file, { path: resolvedPath, status, error: errorMessage });
 }
 await addResource("razors.md", "Reasoning Razors", "Occam/MDL, Bayesian Occam, Sagan, Hitchens, Hanlon, Popper");
 await addResource("systems-cheatsheet.md", "Systems Thinking Cheatsheet", "Causal loops, stocks/flows, leverage points");
@@ -96,6 +124,7 @@ const modeDescription = localMode
     ? "LOCAL MODE (deterministic fallbacks, no external LLM calls)"
     : "CLOUD MODE (external LLM providers enabled)";
 const mode = process.env.MCP_TRANSPORT ?? "stdio";
+diagnostics.setMode({ transport: mode, description: modeDescription, localMode });
 if (mode === "http") {
     const port = Number(process.env.PORT ?? 3333);
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });

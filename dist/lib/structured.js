@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { directLLMSample } from "./llm.js";
+import { config } from "./config.js";
 export const ReasoningMetadataSchema = z.object({
     source: z.enum(["model", "fallback"]),
     warnings: z.array(z.string()).default([]),
@@ -52,19 +53,18 @@ function estimateTokens(text) {
 }
 function buildCandidates(raw) {
     const trimmed = raw.trim();
-    const MAX_CANDIDATE_LENGTH = 50_000;
-    const MAX_CANDIDATE_COUNT = 6;
+    const { maxCandidateLength, maxCandidateCount } = config.memoryProfile;
     const candidates = new Set();
     if (!trimmed) {
         return [];
     }
-    if (trimmed.length <= MAX_CANDIDATE_LENGTH) {
+    if (trimmed.length <= maxCandidateLength) {
         candidates.add(trimmed);
     }
     const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(trimmed);
     if (fenced?.[1]) {
         const candidate = fenced[1].trim();
-        if (candidate.length <= MAX_CANDIDATE_LENGTH) {
+        if (candidate.length <= maxCandidateLength) {
             candidates.add(candidate);
         }
     }
@@ -72,7 +72,7 @@ function buildCandidates(raw) {
     const lastBrace = trimmed.lastIndexOf("}");
     if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
         const braceCandidate = trimmed.slice(firstBrace, lastBrace + 1).trim();
-        if (braceCandidate.length <= MAX_CANDIDATE_LENGTH) {
+        if (braceCandidate.length <= maxCandidateLength) {
             candidates.add(braceCandidate);
         }
     }
@@ -80,13 +80,13 @@ function buildCandidates(raw) {
     const lastBracket = trimmed.lastIndexOf("]");
     if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
         const bracketCandidate = trimmed.slice(firstBracket, lastBracket + 1).trim();
-        if (bracketCandidate.length <= MAX_CANDIDATE_LENGTH) {
+        if (bracketCandidate.length <= maxCandidateLength) {
             candidates.add(bracketCandidate);
         }
     }
     return Array.from(candidates.values())
         .filter((candidate) => candidate.length > 0)
-        .slice(0, MAX_CANDIDATE_COUNT);
+        .slice(0, maxCandidateCount);
 }
 function tryParse(candidate) {
     try {

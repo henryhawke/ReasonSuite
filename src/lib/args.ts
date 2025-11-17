@@ -178,13 +178,26 @@ export function normalizeToolInput(rawArgs: unknown): Record<string, unknown> {
         "proposal",
         "context",
         "question",
+        "candidates_json",
+        "model_json",
+        "variables_json",
     ]);
 
     for (const key of ensureStringFields) {
         const value = normalized[key];
+        if (value === undefined || value === null) {
+            continue;
+        }
         const coerced = coerceString(value);
         if (coerced !== undefined) {
             normalized[key] = coerced;
+        } else if (typeof value === "object") {
+            // Last resort: serialize objects/arrays to JSON for string fields
+            try {
+                normalized[key] = JSON.stringify(value);
+            } catch {
+                // If serialization fails, leave as-is and let schema validation catch it
+            }
         }
     }
 

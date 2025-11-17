@@ -5,6 +5,7 @@ import { buildStructuredPrompt } from "../lib/prompt.js";
 import { DEFAULT_RAZORS } from "../lib/razors.js";
 import { ReasoningMetadataSchema, sampleStructuredJson } from "../lib/structured.js";
 import { buildFallback as selectorFallback } from "../tools/selector.js";
+import { SIGNAL_DESCRIPTIONS } from "./signals.js";
 const ModeSchema = z.enum([
     "socratic",
     "abductive",
@@ -37,17 +38,32 @@ const TOOL_TO_MODE = {
     "exec.run": "exec",
 };
 const MODE_KEYWORD_RULES = [
-    { pattern: /(clarify|scope|question|probe)/i, mode: "socratic" },
-    { pattern: /(hypoth|explanation|diagnos|root cause|test explanations)/i, mode: "abductive" },
-    { pattern: /(prune|refine|razor|screen|evaluate|critique)/i, mode: "razors.apply" },
-    { pattern: /(brainstorm|generate|diverge|ideat|option)/i, mode: "divergent" },
-    { pattern: /(system|feedback|loop|leverage|stock|flow)/i, mode: "systems" },
-    { pattern: /(analogy|analog|map structure)/i, mode: "analogical" },
-    { pattern: /(constraint|optimi[sz]|feasible|schedule|budget|limit)/i, mode: "constraint" },
-    { pattern: /(risk|threat|challenge|red team|attack)/i, mode: "redblue" },
-    { pattern: /(experiment|scientific|test plan|measure)/i, mode: "scientific" },
-    { pattern: /(explain|self[-_ ]?explain|rationale|critique)/i, mode: "self_explain" },
-    { pattern: /(code|execute|compute|script|run)/i, mode: "exec" },
+    // Core reasoning modes
+    { pattern: /(clarify|scope|question|probe|why|how|when|what if)/i, mode: "socratic", weight: 1.0 },
+    { pattern: /(hypoth|explanation|diagnos|root cause|test explanations|investigate|anomaly|incident)/i, mode: "abductive", weight: 1.2 },
+    { pattern: /(prune|refine|razor|screen|evaluate|critique|assess|judge|filter)/i, mode: "razors.apply", weight: 1.0 },
+    { pattern: /(brainstorm|generate|diverge|ideat|option|alternative|creative|explore)/i, mode: "divergent", weight: 1.0 },
+    // Systems & complexity
+    { pattern: /(system|feedback|loop|leverage|stock|flow|cascade|ripple|network|interconnect)/i, mode: "systems", weight: 1.1 },
+    { pattern: /(analogy|analog|map structure|similar|pattern|comparison|metaphor)/i, mode: "analogical", weight: 1.0 },
+    // Optimization & constraints
+    { pattern: /(constraint|optimi[sz]|feasible|schedule|budget|limit|resource|allocation|capacity|maximize|minimize)/i, mode: "constraint", weight: 1.2 },
+    // Risk & adversarial
+    { pattern: /(risk|threat|challenge|red team|attack|vulnerability|exploit|adversary|counter|defense|security)/i, mode: "redblue", weight: 1.1 },
+    // Finance & business
+    { pattern: /(revenue|profit|cost|pricing|margin|roi|valuation|finance|fiscal|monetary|investment|portfolio)/i, mode: "constraint", weight: 1.1 },
+    { pattern: /(market|competition|competitive|strategy|positioning|differentiat|advantage)/i, mode: "dialectic", weight: 1.1 },
+    { pattern: /(forecast|projection|growth|trend|metric|kpi|performance|dashboard)/i, mode: "systems", weight: 1.0 },
+    // Legal & compliance
+    { pattern: /(legal|compliance|regulatory|audit|govern|policy|rule|requirement|mandate|obligat)/i, mode: "razors.apply", weight: 1.2 },
+    { pattern: /(liability|risk assessment|due diligence|contract|agreement|terms)/i, mode: "dialectic", weight: 1.1 },
+    // Scientific & experimental
+    { pattern: /(experiment|scientific|test plan|measure|hypothesis|empirical|data|evidence|validate)/i, mode: "scientific", weight: 1.2 },
+    // Analysis & explanation
+    { pattern: /(explain|self[-_ ]?explain|rationale|justify|reasoning|logic|argument)/i, mode: "self_explain", weight: 1.0 },
+    { pattern: /(debate|argue|claim|counter|thesis|dialectic|position|stance)/i, mode: "dialectic", weight: 1.1 },
+    // Technical & execution
+    { pattern: /(code|execute|compute|script|run|program|implement|automate)/i, mode: "exec", weight: 1.0 },
 ];
 function determineMode(value, tool) {
     const normalizedValue = value.trim().toLowerCase();
@@ -104,19 +120,6 @@ const InputSchema = z.object({
     maxSteps: z.number().int().positive().max(8).default(4),
 });
 const inputShape = InputSchema.shape;
-const SIGNAL_DESCRIPTIONS = {
-    needsHypotheses: "Diagnosis / uncertainty cues detected → schedule abductive.hypothesize to explore explanations.",
-    needsCreative: "Creative or brainstorming language detected → add reasoning.divergent_convergent for option generation.",
-    needsSystems: "Systemic / feedback terminology detected → include systems.map to surface loops and leverage points.",
-    needsConstraint: "Constraint or optimisation keywords detected → include constraint.solve for feasibility checking.",
-    needsRisk: "Risk, safety, or abuse terms detected → run redblue.challenge before finalising outcomes.",
-    contested: "Controversy or trade-off language detected → use dialectic.tas to examine opposing positions.",
-    wantsAnalogy: "Analogy or comparison cues detected → include analogical.map to transfer structure carefully.",
-    needsScientific: "Experiment / evidence requests detected → include reasoning.scientific for test planning.",
-    wantsSelfExplain: "Transparency / rationale requests detected → finish with reasoning.self_explain.",
-    codeOrCalc: "Code or computation keywords detected → schedule exec.run for sandboxed verification.",
-    deepScope: "Complex strategy / roadmap wording detected → use a deeper socratic.inquire depth setting.",
-};
 export function registerRouter(server) {
     const handler = async (rawArgs, _extra) => {
         const parsed = InputSchema.safeParse(normalizeToolInput(rawArgs));
