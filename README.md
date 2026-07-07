@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/henryhawke-reasonsuite-badge.png)](https://mseep.ai/app/henryhawke-reasonsuite)
+
 # ReasonSuite
 
 MCP for using logical razors and types of reasoning. ReasonSuite is a structured thinking framework that helps a model work through any problem. Give your model trusted logical heuristics instead of relying solely on an llm's emergent reasoning.
